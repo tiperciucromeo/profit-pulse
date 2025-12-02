@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { TrendingUp, DollarSign, Package, Percent } from "lucide-react";
+import { TrendingUp, DollarSign, Package, Percent, Factory } from "lucide-react";
 import { format } from "date-fns";
 import { ro } from "date-fns/locale";
 import { MetricCard } from "@/components/dashboard/MetricCard";
@@ -70,6 +70,10 @@ const Index = () => {
       (sum, item) => sum + Number(item.real_revenue),
       0
     );
+    const totalProductionCost = filteredItems.reduce(
+      (sum, item) => sum + Number(item.production_cost),
+      0
+    );
 
     // Count unique orders
     const uniqueOrders = new Set(
@@ -79,6 +83,7 @@ const Index = () => {
     return {
       totalProfit,
       totalRevenue,
+      totalProductionCost,
       totalOrders: uniqueOrders.size,
       profitMargin: totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0,
     };
@@ -125,7 +130,7 @@ const Index = () => {
         <SyncPanel onSync={refetch} isLoading={isLoading} />
 
         {/* Metric Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           <MetricCard
             title="Profit Net Total"
             value={`${filteredMetrics.totalProfit.toFixed(2)} RON`}
@@ -142,11 +147,19 @@ const Index = () => {
             delay={50}
           />
           <MetricCard
+            title="Costuri Producție"
+            value={`${filteredMetrics.totalProductionCost.toFixed(2)} RON`}
+            subtitle={periodSubtitle}
+            icon={Factory}
+            variant="destructive"
+            delay={100}
+          />
+          <MetricCard
             title="Comenzi Procesate"
             value={String(filteredMetrics.totalOrders)}
             subtitle={periodSubtitle}
             icon={Package}
-            delay={100}
+            delay={150}
           />
           <MetricCard
             title="Marjă Reală"
@@ -154,7 +167,7 @@ const Index = () => {
             subtitle="Profit / Vânzări"
             icon={Percent}
             variant="accent"
-            delay={150}
+            delay={200}
           />
         </div>
 
