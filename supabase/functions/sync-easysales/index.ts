@@ -60,15 +60,43 @@ serve(async (req) => {
     for (const order of orders) {
       const orderId = order.internal_id || order.id || order.order_display_id;
       
+      // Log customer-related fields from first order for debugging
+      if (orders.indexOf(order) === 0) {
+        console.log('Customer fields available:', JSON.stringify({
+          customer_name: order.customer_name,
+          billing_name: order.billing_name,
+          billing_first_name: order.billing_first_name,
+          billing_last_name: order.billing_last_name,
+          shipping_name: order.shipping_name,
+          customer: order.customer,
+          client: order.client,
+          buyer_name: order.buyer_name,
+          contact_name: order.contact_name,
+        }));
+      }
+      
+      // Extract customer name from order - try multiple field names
+      const customerName = order.customer_name || order.billing_name || 
+        `${order.billing_first_name || ''} ${order.billing_last_name || ''}`.trim() ||
+        order.shipping_name || order.buyer_name || order.contact_name ||
+        (order.customer?.name) || (order.client?.name) || 'N/A';
+      
       // Check if order already exists
       const { data: existingOrder } = await supabase
         .from('orders')
-        .select('id')
+        .select('id, customer_name')
         .eq('easysales_order_id', String(orderId))
-        .single();
+        .maybeSingle();
 
       if (existingOrder) {
-        console.log(`Order ${orderId} already exists, skipping`);
+        // Update customer_name if it's missing or 'N/A'
+        if (!existingOrder.customer_name || existingOrder.customer_name === 'N/A') {
+          await supabase
+            .from('orders')
+            .update({ customer_name: customerName })
+            .eq('id', existingOrder.id);
+          console.log(`Updated customer name for order ${orderId}: ${customerName}`);
+        }
         continue;
       }
 
@@ -82,11 +110,6 @@ serve(async (req) => {
       const adjustmentPerItem = (shippingCost - discountAmount) / totalItems;
 
       console.log(`Order ${orderId}: shipping=${shippingCost}, discount=${discountAmount}, items=${totalItems}, adjustment/item=${adjustmentPerItem}`);
-
-      // Extract customer name from order
-      const customerName = order.customer_name || order.billing_name || 
-        `${order.billing_first_name || ''} ${order.billing_last_name || ''}`.trim() || 
-        order.shipping_name || 'N/A';
 
       // Insert order
       const { data: newOrder, error: orderError } = await supabase
