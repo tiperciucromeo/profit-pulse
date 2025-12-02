@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.sync-costs]
 verify_jwt = false
+
+[functions.recalculate-costs]
+verify_jwt = false
+
+[functions.resync-orders]
+verify_jwt = false

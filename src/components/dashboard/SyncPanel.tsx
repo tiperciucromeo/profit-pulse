@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RefreshCw, Upload, Settings, CheckCircle2, FileSpreadsheet, Calculator } from "lucide-react";
+import { RefreshCw, Upload, Settings, CheckCircle2, FileSpreadsheet, Calculator, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -17,6 +17,7 @@ export function SyncPanel({ onSync, isLoading }: SyncPanelProps) {
   const [googleSheetUrl, setGoogleSheetUrl] = useState("");
   const [isSyncingCosts, setIsSyncingCosts] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
+  const [isResyncing, setIsResyncing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSyncEasySales = async () => {
@@ -126,6 +127,35 @@ export function SyncPanel({ onSync, isLoading }: SyncPanelProps) {
     }
   };
 
+  const handleResyncOrders = async () => {
+    setIsResyncing(true);
+    toast.info("Re-sincronizare în curs...", {
+      description: "Acest proces poate dura câteva minute",
+    });
+    try {
+      const { data, error } = await supabase.functions.invoke("resync-orders");
+      
+      if (error) throw error;
+      
+      toast.success("Re-sincronizare completă!", {
+        description: `${data?.ordersProcessed || 0} comenzi verificate, ${data?.differences?.length || 0} diferențe găsite`,
+      });
+      
+      if (data?.differences && data.differences.length > 0) {
+        console.log("Diferențe găsite:", data.differences);
+      }
+      
+      onSync();
+    } catch (error) {
+      console.error('Resync error:', error);
+      toast.error("Eroare la re-sincronizare", {
+        description: "Verifică logurile pentru detalii",
+      });
+    } finally {
+      setIsResyncing(false);
+    }
+  };
+
   return (
     <Card className="animate-slide-up border-border bg-card" style={{ animationDelay: "100ms" }}>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -177,6 +207,19 @@ export function SyncPanel({ onSync, isLoading }: SyncPanelProps) {
               <Calculator className="mr-2 h-4 w-4" />
             )}
             Recalculează Costuri
+          </Button>
+          <Button
+            onClick={handleResyncOrders}
+            variant="outline"
+            disabled={isResyncing}
+            className="flex-1 min-w-[150px] border-amber-500/50 text-amber-600 hover:bg-amber-500/10"
+          >
+            {isResyncing ? (
+              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RotateCcw className="mr-2 h-4 w-4" />
+            )}
+            Re-sync Comenzi
           </Button>
           <input
             ref={fileInputRef}
