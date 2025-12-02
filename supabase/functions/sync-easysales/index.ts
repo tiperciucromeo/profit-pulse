@@ -24,8 +24,8 @@ serve(async (req) => {
 
     console.log('Fetching orders from EasySales API...');
 
-    // Fetch orders from EasySales API - correct URL
-    const ordersResponse = await fetch('https://easy-sales.com/api/v2/orders?per_page=100&status=3', {
+    // Fetch only "Finalizate" (Completed) orders - status=4 in EasySales
+    const ordersResponse = await fetch('https://easy-sales.com/api/v2/orders?per_page=100&status=4', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${websiteToken}`,
@@ -41,7 +41,7 @@ serve(async (req) => {
     }
 
     const ordersData = await ordersResponse.json();
-    console.log('Orders response:', JSON.stringify(ordersData).substring(0, 500));
+    console.log('Orders response:', JSON.stringify(ordersData).substring(0, 1000));
 
     const orders = ordersData.data || [];
     let ordersProcessed = 0;
@@ -97,13 +97,24 @@ serve(async (req) => {
       // Insert order items
       for (const item of items) {
         const sku = item.sku || item.product_sku || '';
-        // Get the net price and calculate price with VAT (19% TVA in Romania)
-        const netPrice = parseFloat(item.sale_price || item.price || 0);
-        const salePrice = netPrice * 1.19; // Add 19% TVA
+        // Log all price fields to find the correct one with VAT
+        console.log(`Product ${sku} price fields:`, JSON.stringify({
+          price: item.price,
+          sale_price: item.sale_price,
+          final_price: item.final_price,
+          price_with_vat: item.price_with_vat,
+          total_price: item.total_price,
+          unit_price: item.unit_price
+        }));
+        
+        // Use "price" field which should be the full price with VAT
+        // If not available, fall back to sale_price * 1.19
+        const priceWithVat = parseFloat(item.price || item.final_price || item.price_with_vat || 0);
+        const salePrice = priceWithVat > 0 ? priceWithVat : parseFloat(item.sale_price || 0) * 1.19;
         const quantity = parseInt(item.quantity || 1);
         const productionCost = costMap.get(sku) || 0;
         
-        console.log(`Product ${sku}: net_price=${netPrice}, price_with_vat=${salePrice}`);
+        console.log(`Product ${sku}: final_sale_price_with_vat=${salePrice}`);
 
         for (let i = 0; i < quantity; i++) {
           const realRevenue = salePrice - adjustmentPerItem;
