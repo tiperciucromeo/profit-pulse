@@ -21,20 +21,22 @@ const Index = () => {
     let filtered = recentItems;
 
     if (dateFrom) {
+      // Compare only the date part (YYYY-MM-DD) to avoid timezone issues
+      const fromDateStr = dateFrom.toISOString().split('T')[0];
       filtered = filtered.filter((item) => {
         if (!item.orders?.order_date) return false;
-        const orderDate = new Date(item.orders.order_date);
-        return orderDate >= dateFrom;
+        const orderDateStr = new Date(item.orders.order_date).toISOString().split('T')[0];
+        return orderDateStr >= fromDateStr;
       });
     }
 
     if (dateTo) {
-      const endOfDay = new Date(dateTo);
-      endOfDay.setHours(23, 59, 59, 999);
+      // Compare only the date part (YYYY-MM-DD) to avoid timezone issues
+      const toDateStr = dateTo.toISOString().split('T')[0];
       filtered = filtered.filter((item) => {
         if (!item.orders?.order_date) return false;
-        const orderDate = new Date(item.orders.order_date);
-        return orderDate <= endOfDay;
+        const orderDateStr = new Date(item.orders.order_date).toISOString().split('T')[0];
+        return orderDateStr <= toDateStr;
       });
     }
 
