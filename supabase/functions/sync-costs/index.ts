@@ -6,124 +6,129 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const BATCH_SIZE = 500;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { sheetUrl } = await req.json();
+    const { sheetUrl, csvData } = await req.json();
     
-    if (!sheetUrl) {
-      throw new Error('Missing Google Sheet URL');
+    if (!sheetUrl && !csvData) {
+      throw new Error('Missing Google Sheet URL or CSV data');
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log('Fetching costs from Google Sheets:', sheetUrl);
+    let csvText: string;
 
-    // Convert Google Sheets URL to CSV export URL
-    let csvUrl = sheetUrl;
-    if (sheetUrl.includes('/edit')) {
-      // Convert edit URL to CSV export URL
-      csvUrl = sheetUrl.replace('/edit#gid=', '/export?format=csv&gid=').replace('/edit?gid=', '/export?format=csv&gid=').replace('/edit', '/export?format=csv');
-    } else if (sheetUrl.includes('spreadsheets/d/')) {
-      // Extract sheet ID and create CSV URL
-      const match = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-      if (match) {
-        csvUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv`;
+    if (csvData) {
+      // Direct CSV data provided
+      csvText = csvData;
+      console.log('Using provided CSV data');
+    } else {
+      // Fetch from Google Sheets
+      console.log('Fetching costs from Google Sheets:', sheetUrl);
+
+      let csvUrl = sheetUrl;
+      if (sheetUrl.includes('/edit')) {
+        csvUrl = sheetUrl.replace('/edit#gid=', '/export?format=csv&gid=').replace('/edit?gid=', '/export?format=csv&gid=').replace('/edit', '/export?format=csv');
+      } else if (sheetUrl.includes('spreadsheets/d/')) {
+        const match = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (match) {
+          csvUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv`;
+        }
       }
+
+      console.log('CSV URL:', csvUrl);
+
+      const response = await fetch(csvUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch Google Sheet: ${response.status}`);
+      }
+
+      csvText = await response.text();
     }
 
-    console.log('CSV URL:', csvUrl);
-
-    const response = await fetch(csvUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch Google Sheet: ${response.status}`);
-    }
-
-    const csvText = await response.text();
     console.log('CSV content (first 500 chars):', csvText.substring(0, 500));
 
     // Parse CSV
     const lines = csvText.split('\n').filter(line => line.trim());
     if (lines.length < 2) {
-      throw new Error('Google Sheet appears to be empty or has no data rows');
+      throw new Error('CSV appears to be empty or has no data rows');
     }
 
     // Get headers and find column indices
     const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim());
     console.log('Headers found:', headers);
 
-    // Look for SKU column: "cod produs", "cod", "sku"
     const skuIndex = headers.findIndex(h => 
       h.includes('cod produs') || h.includes('cod') || h.includes('sku')
     );
     
-    // Look for name column: first column or one containing "nume", "name", "produs"
     let nameIndex = headers.findIndex(h => 
       h.includes('nume') || h.includes('name') || h.includes('denumire')
     );
-    // If no name column found, use first column (often the product name)
     if (nameIndex === -1) nameIndex = 0;
     
-    // Look for cost column: "pret productie", "cost productie", "cost"
     const costIndex = headers.findIndex(h => 
-      h.includes('pret productie') || h.includes('cost productie') || 
+      h.includes('pret productie') || h.includes('cost productie') || h.includes('cost prod') ||
       h.includes('production') || (h.includes('cost') && !h.includes('reducere'))
     );
 
     console.log(`Column indices - SKU: ${skuIndex}, Name: ${nameIndex}, Cost: ${costIndex}`);
 
     if (skuIndex === -1 || costIndex === -1) {
-      throw new Error(`Nu am găsit coloanele necesare. Coloane găsite: ${headers.join(', ')}. Am nevoie de: "Cod Produs" și "Pret Productie"`);
+      throw new Error(`Nu am găsit coloanele necesare. Coloane găsite: ${headers.join(', ')}. Am nevoie de: "SKU" și "Cost Producție"`);
     }
 
-    let productsUpdated = 0;
-    let productsInserted = 0;
+    // Collect all products to upsert
+    const products: { sku: string; product_name: string; production_cost: number }[] = [];
+    let skippedRows = 0;
 
-    // Process data rows
     for (let i = 1; i < lines.length; i++) {
       const values = parseCSVLine(lines[i]);
       const sku = values[skuIndex]?.trim();
       const productName = nameIndex >= 0 ? values[nameIndex]?.trim() : 'Unknown';
       const costStr = values[costIndex]?.trim().replace(',', '.');
-      const productionCost = parseFloat(costStr) || 0;
+      const productionCost = parseFloat(costStr);
 
-      if (!sku || productionCost === 0) {
-        console.log(`Skipping row ${i}: SKU=${sku}, cost=${costStr}`);
+      if (!sku || isNaN(productionCost) || productionCost === 0) {
+        skippedRows++;
         continue;
       }
 
-      console.log(`Processing: SKU=${sku}, Name=${productName}, Cost=${productionCost}`);
-
-      // Upsert product cost
-      const { data: existing } = await supabase
-        .from('product_costs')
-        .select('id')
-        .eq('sku', sku)
-        .single();
-
-      if (existing) {
-        await supabase
-          .from('product_costs')
-          .update({ production_cost: productionCost, product_name: productName })
-          .eq('sku', sku);
-        productsUpdated++;
-      } else {
-        await supabase
-          .from('product_costs')
-          .insert({ sku, product_name: productName, production_cost: productionCost });
-        productsInserted++;
-      }
+      products.push({ sku, product_name: productName, production_cost: productionCost });
     }
 
-    console.log(`Sync complete. Inserted: ${productsInserted}, Updated: ${productsUpdated}`);
+    console.log(`Found ${products.length} valid products, skipped ${skippedRows} invalid rows`);
+
+    // Batch upsert
+    let totalUpserted = 0;
+    for (let i = 0; i < products.length; i += BATCH_SIZE) {
+      const batch = products.slice(i, i + BATCH_SIZE);
+      
+      const { error } = await supabase
+        .from('product_costs')
+        .upsert(batch, { onConflict: 'sku', ignoreDuplicates: false });
+
+      if (error) {
+        console.error(`Batch upsert error at ${i}:`, error);
+        throw error;
+      }
+
+      totalUpserted += batch.length;
+      console.log(`Upserted batch ${Math.floor(i / BATCH_SIZE) + 1}: ${batch.length} products (total: ${totalUpserted})`);
+    }
+
+    console.log(`Sync complete. Total upserted: ${totalUpserted}`);
 
     return new Response(
-      JSON.stringify({ success: true, productsInserted, productsUpdated }),
+      JSON.stringify({ success: true, totalUpserted, skippedRows }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
