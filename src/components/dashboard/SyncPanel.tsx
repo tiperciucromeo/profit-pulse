@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RefreshCw, Upload, Settings, CheckCircle2 } from "lucide-react";
+import { RefreshCw, Upload, Settings, CheckCircle2, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -15,6 +15,8 @@ interface SyncPanelProps {
 export function SyncPanel({ onSync, isLoading }: SyncPanelProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [googleSheetUrl, setGoogleSheetUrl] = useState("");
+  const [isSyncingCosts, setIsSyncingCosts] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSyncEasySales = async () => {
     try {
@@ -39,6 +41,7 @@ export function SyncPanel({ onSync, isLoading }: SyncPanelProps) {
       return;
     }
 
+    setIsSyncingCosts(true);
     try {
       const { data, error } = await supabase.functions.invoke("sync-costs", {
         body: { sheetUrl: googleSheetUrl },
@@ -47,12 +50,57 @@ export function SyncPanel({ onSync, isLoading }: SyncPanelProps) {
       if (error) throw error;
       
       toast.success("Costuri actualizate!", {
-        description: `${data?.productsUpdated || 0} produse sincronizate`,
+        description: `${data?.totalUpserted || 0} produse sincronizate`,
       });
+      onSync();
     } catch (error) {
       toast.error("Eroare la sincronizare costuri", {
         description: "Verifică URL-ul Google Sheet",
       });
+    } finally {
+      setIsSyncingCosts(false);
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Check file type
+    const validTypes = ['.csv', '.txt'];
+    const fileExt = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    
+    if (!validTypes.includes(fileExt)) {
+      toast.error("Format invalid", {
+        description: "Te rog încarcă un fișier CSV",
+      });
+      return;
+    }
+
+    setIsSyncingCosts(true);
+    try {
+      const csvData = await file.text();
+      
+      const { data, error } = await supabase.functions.invoke("sync-costs", {
+        body: { csvData },
+      });
+      
+      if (error) throw error;
+      
+      toast.success("Costuri importate!", {
+        description: `${data?.totalUpserted || 0} produse sincronizate`,
+      });
+      onSync();
+    } catch (error) {
+      console.error('File upload error:', error);
+      toast.error("Eroare la import", {
+        description: "Verifică formatul fișierului CSV",
+      });
+    } finally {
+      setIsSyncingCosts(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -83,28 +131,50 @@ export function SyncPanel({ onSync, isLoading }: SyncPanelProps) {
             Sincronizează EasySales
           </Button>
           <Button
-            onClick={handleSyncCosts}
+            onClick={() => fileInputRef.current?.click()}
             variant="outline"
-            disabled={isLoading}
+            disabled={isSyncingCosts}
             className="flex-1"
           >
-            <Upload className="mr-2 h-4 w-4" />
-            Sincronizează Costuri
+            {isSyncingCosts ? (
+              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+            )}
+            Import Costuri CSV
           </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.txt"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
         </div>
 
         {showSettings && (
           <div className="space-y-3 pt-4 border-t border-border animate-fade-in">
             <div className="space-y-2">
               <Label htmlFor="sheet-url">URL Google Sheet (Bază de date Costuri)</Label>
-              <Input
-                id="sheet-url"
-                placeholder="https://docs.google.com/spreadsheets/d/..."
-                value={googleSheetUrl}
-                onChange={(e) => setGoogleSheetUrl(e.target.value)}
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="sheet-url"
+                  placeholder="https://docs.google.com/spreadsheets/d/..."
+                  value={googleSheetUrl}
+                  onChange={(e) => setGoogleSheetUrl(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={handleSyncCosts}
+                  variant="secondary"
+                  disabled={isSyncingCosts || !googleSheetUrl}
+                  size="sm"
+                >
+                  <Upload className="h-4 w-4" />
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground">
-                Sheet-ul trebuie să aibă coloanele: SKU, Nume Produs, Cost Producție
+                Sheet-ul/CSV-ul trebuie să aibă coloanele: SKU, Nume Produs, Cost Producție
               </p>
             </div>
           </div>
