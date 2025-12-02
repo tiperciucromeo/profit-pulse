@@ -217,7 +217,6 @@ export function OrdersTable({ items }: OrdersTableProps) {
                 <TableHead>Client</TableHead>
                 <TableHead>Produs</TableHead>
                 <TableHead>SKU</TableHead>
-                <TableHead className="text-right">Preț Vânzare</TableHead>
                 <TableHead className="text-right">Cost Producție</TableHead>
                 <TableHead className="text-right">Venit Real</TableHead>
                 <TableHead className="text-right">Profit Net</TableHead>
@@ -226,7 +225,7 @@ export function OrdersTable({ items }: OrdersTableProps) {
             <TableBody>
               {paginatedItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                     Nu există date încă. Sincronizează comenzile din EasySales.
                   </TableCell>
                 </TableRow>
@@ -249,9 +248,6 @@ export function OrdersTable({ items }: OrdersTableProps) {
                     <TableCell className="font-medium">{item.product_name}</TableCell>
                     <TableCell className="font-mono text-muted-foreground">
                       {item.sku}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {item.sale_price.toFixed(2)} RON
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground">
                       {item.production_cost.toFixed(2)} RON

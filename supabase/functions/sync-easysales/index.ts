@@ -27,26 +27,56 @@ serve(async (req) => {
 
     console.log('Fetching orders from EasySales API...');
 
-    // Fetch "Finalizate" (Completed) orders - status=3 in EasySales
-    const ordersResponse = await fetch('https://easy-sales.com/api/v2/orders?per_page=100&status=3', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${websiteToken}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-    });
+    // Fetch all "Finalizate" (Completed) orders from August 2025 onwards
+    // Use pagination to get all orders
+    let allOrders: any[] = [];
+    let currentPage = 1;
+    let hasMorePages = true;
+    const startDate = '2025-08-01';
+    
+    while (hasMorePages) {
+      const url = `https://easy-sales.com/api/v2/orders?per_page=100&status=3&page=${currentPage}&date_from=${startDate}`;
+      console.log(`Fetching page ${currentPage}: ${url}`);
+      
+      const ordersResponse = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${websiteToken}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      });
 
-    if (!ordersResponse.ok) {
-      const errorText = await ordersResponse.text();
-      console.error('EasySales API error:', ordersResponse.status, errorText);
-      throw new Error(`EasySales API error: ${ordersResponse.status} - ${errorText}`);
+      if (!ordersResponse.ok) {
+        const errorText = await ordersResponse.text();
+        console.error('EasySales API error:', ordersResponse.status, errorText);
+        throw new Error(`EasySales API error: ${ordersResponse.status} - ${errorText}`);
+      }
+
+      const ordersData = await ordersResponse.json();
+      const pageOrders = ordersData.data || [];
+      
+      console.log(`Page ${currentPage}: got ${pageOrders.length} orders`);
+      
+      allOrders = allOrders.concat(pageOrders);
+      
+      // Check if there are more pages
+      if (pageOrders.length < 100) {
+        hasMorePages = false;
+      } else {
+        currentPage++;
+      }
+      
+      // Safety limit to prevent infinite loops
+      if (currentPage > 50) {
+        console.log('Reached page limit (50), stopping pagination');
+        hasMorePages = false;
+      }
     }
+    
+    console.log(`Total orders fetched: ${allOrders.length}`);
 
-    const ordersData = await ordersResponse.json();
-    console.log('Orders response:', JSON.stringify(ordersData).substring(0, 1000));
-
-    const orders = ordersData.data || [];
+    const orders = allOrders;
     let ordersProcessed = 0;
 
     // Get product costs for profit calculation
