@@ -17,7 +17,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { format } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from "date-fns";
 import { ro } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Search, CalendarIcon, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -57,6 +57,35 @@ export function OrdersTable({
 }: OrdersTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activePreset, setActivePreset] = useState<string | null>(null);
+
+  const applyPreset = (preset: string) => {
+    const today = new Date();
+    setActivePreset(preset);
+    setCurrentPage(1);
+
+    switch (preset) {
+      case "week":
+        onDateFromChange(startOfWeek(today, { weekStartsOn: 1 }));
+        onDateToChange(endOfWeek(today, { weekStartsOn: 1 }));
+        break;
+      case "month":
+        onDateFromChange(startOfMonth(today));
+        onDateToChange(endOfMonth(today));
+        break;
+      case "last30":
+        onDateFromChange(subDays(today, 30));
+        onDateToChange(today);
+        break;
+    }
+  };
+
+  const clearAllFilters = () => {
+    onDateFromChange(undefined);
+    onDateToChange(undefined);
+    setActivePreset(null);
+    setCurrentPage(1);
+  };
 
   const filteredItems = useMemo(() => {
     let filtered = items;
@@ -97,12 +126,6 @@ export function OrdersTable({
     startIndex,
     startIndex + ITEMS_PER_PAGE
   );
-
-  const clearDateFilters = () => {
-    onDateFromChange(undefined);
-    onDateToChange(undefined);
-    setCurrentPage(1);
-  };
 
   return (
     <Card
@@ -174,6 +197,7 @@ export function OrdersTable({
                 selected={dateFrom}
                 onSelect={(date) => {
                   onDateFromChange(date);
+                  setActivePreset(null);
                   setCurrentPage(1);
                 }}
                 initialFocus
@@ -204,6 +228,7 @@ export function OrdersTable({
                 selected={dateTo}
                 onSelect={(date) => {
                   onDateToChange(date);
+                  setActivePreset(null);
                   setCurrentPage(1);
                 }}
                 initialFocus
@@ -213,10 +238,34 @@ export function OrdersTable({
             </PopoverContent>
           </Popover>
 
+          <div className="flex items-center gap-1 border-l border-border pl-3 ml-1">
+            <Button
+              variant={activePreset === "week" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => applyPreset("week")}
+            >
+              Săptămâna
+            </Button>
+            <Button
+              variant={activePreset === "month" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => applyPreset("month")}
+            >
+              Luna
+            </Button>
+            <Button
+              variant={activePreset === "last30" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => applyPreset("last30")}
+            >
+              30 zile
+            </Button>
+          </div>
+
           {(dateFrom || dateTo) && (
-            <Button variant="ghost" size="sm" onClick={clearDateFilters}>
+            <Button variant="ghost" size="sm" onClick={clearAllFilters}>
               <X className="h-4 w-4 mr-1" />
-              Șterge filtre
+              Șterge
             </Button>
           )}
 
