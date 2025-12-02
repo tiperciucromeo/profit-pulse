@@ -10,7 +10,7 @@ interface MetricCardProps {
     value: number;
     isPositive: boolean;
   };
-  variant?: "default" | "success" | "warning" | "accent";
+  variant?: "default" | "success" | "warning" | "accent" | "destructive";
   delay?: number;
 }
 
@@ -28,6 +28,7 @@ export function MetricCard({
     success: "gradient-success text-primary-foreground border-transparent",
     warning: "gradient-warning text-warning-foreground border-transparent",
     accent: "gradient-accent text-accent-foreground border-transparent",
+    destructive: "bg-destructive/10 border-destructive/20 text-foreground",
   };
 
   const iconVariants = {
@@ -35,6 +36,7 @@ export function MetricCard({
     success: "bg-primary-foreground/20 text-primary-foreground",
     warning: "bg-warning-foreground/20 text-warning-foreground",
     accent: "bg-accent-foreground/20 text-accent-foreground",
+    destructive: "bg-destructive/20 text-destructive",
   };
 
   const textVariants = {
@@ -42,6 +44,7 @@ export function MetricCard({
     success: "text-primary-foreground/80",
     warning: "text-warning-foreground/80",
     accent: "text-accent-foreground/80",
+    destructive: "text-muted-foreground",
   };
 
   return (
