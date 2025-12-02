@@ -60,19 +60,9 @@ serve(async (req) => {
     for (const order of orders) {
       const orderId = order.internal_id || order.id || order.order_display_id;
       
-      // Log fields from first order for debugging
-      if (orders.indexOf(order) === 0) {
-        console.log('First order ALL FIELDS:', JSON.stringify(order));
-        console.log('Shipping/Discount fields:', JSON.stringify({
-          shipping_price: order.shipping_price,
-          shipping_cost: order.shipping_cost,
-          shipping: order.shipping,
-          delivery_price: order.delivery_price,
-          discount: order.discount,
-          total_discount: order.total_discount,
-          extra_discount: order.extra_discount,
-          voucher_discount: order.voucher_discount,
-        }));
+      // Log specific order for debugging
+      if (String(orderId) === '25005603') {
+        console.log('Order 25005603 ALL FIELDS:', JSON.stringify(order));
       }
       
       // Extract customer name from order - try multiple field names
