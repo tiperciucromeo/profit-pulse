@@ -137,10 +137,9 @@ export function useDashboardData() {
         .from("order_items")
         .select(`
           *,
-          orders(easysales_order_id, order_date)
+          orders!inner(easysales_order_id, order_date)
         `)
-        .order("created_at", { ascending: false })
-        .limit(20);
+        .order("orders(order_date)", { ascending: false });
 
       if (error) throw error;
       return data || [];
