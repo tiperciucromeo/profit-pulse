@@ -40,61 +40,75 @@ interface OrderItem {
 
 interface OrdersTableProps {
   items: OrderItem[];
+  dateFrom?: Date;
+  dateTo?: Date;
+  onDateFromChange: (date: Date | undefined) => void;
+  onDateToChange: (date: Date | undefined) => void;
 }
 
 const ITEMS_PER_PAGE = 20;
 
-export function OrdersTable({ items }: OrdersTableProps) {
+export function OrdersTable({
+  items,
+  dateFrom,
+  dateTo,
+  onDateFromChange,
+  onDateToChange,
+}: OrdersTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
-  const [dateFrom, setDateFrom] = useState<Date | undefined>();
-  const [dateTo, setDateTo] = useState<Date | undefined>();
-  
+
   const filteredItems = useMemo(() => {
     let filtered = items;
-    
+
     // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(item => 
+      filtered = filtered.filter((item) =>
         item.orders?.easysales_order_id?.toLowerCase().includes(query)
       );
     }
-    
+
     // Filter by date range
     if (dateFrom) {
-      filtered = filtered.filter(item => {
+      filtered = filtered.filter((item) => {
         if (!item.orders?.order_date) return false;
         const orderDate = new Date(item.orders.order_date);
         return orderDate >= dateFrom;
       });
     }
-    
+
     if (dateTo) {
       const endOfDay = new Date(dateTo);
       endOfDay.setHours(23, 59, 59, 999);
-      filtered = filtered.filter(item => {
+      filtered = filtered.filter((item) => {
         if (!item.orders?.order_date) return false;
         const orderDate = new Date(item.orders.order_date);
         return orderDate <= endOfDay;
       });
     }
-    
+
     return filtered;
   }, [items, searchQuery, dateFrom, dateTo]);
-  
+
   const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedItems = filteredItems.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const paginatedItems = filteredItems.slice(
+    startIndex,
+    startIndex + ITEMS_PER_PAGE
+  );
 
   const clearDateFilters = () => {
-    setDateFrom(undefined);
-    setDateTo(undefined);
+    onDateFromChange(undefined);
+    onDateToChange(undefined);
     setCurrentPage(1);
   };
 
   return (
-    <Card className="animate-slide-up border-border bg-card" style={{ animationDelay: "400ms" }}>
+    <Card
+      className="animate-slide-up border-border bg-card"
+      style={{ animationDelay: "400ms" }}
+    >
       <CardHeader className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <CardTitle className="text-lg font-semibold">
@@ -108,7 +122,7 @@ export function OrdersTable({ items }: OrdersTableProps) {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -116,7 +130,7 @@ export function OrdersTable({ items }: OrdersTableProps) {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
               >
                 <ChevronRight className="h-4 w-4" />
@@ -124,7 +138,7 @@ export function OrdersTable({ items }: OrdersTableProps) {
             </div>
           )}
         </div>
-        
+
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -138,7 +152,7 @@ export function OrdersTable({ items }: OrdersTableProps) {
               className="pl-9 w-[180px]"
             />
           </div>
-          
+
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -149,7 +163,9 @@ export function OrdersTable({ items }: OrdersTableProps) {
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateFrom ? format(dateFrom, "dd MMM yyyy", { locale: ro }) : "De la"}
+                {dateFrom
+                  ? format(dateFrom, "dd MMM yyyy", { locale: ro })
+                  : "De la"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0 bg-popover" align="start">
@@ -157,7 +173,7 @@ export function OrdersTable({ items }: OrdersTableProps) {
                 mode="single"
                 selected={dateFrom}
                 onSelect={(date) => {
-                  setDateFrom(date);
+                  onDateFromChange(date);
                   setCurrentPage(1);
                 }}
                 initialFocus
@@ -166,7 +182,7 @@ export function OrdersTable({ items }: OrdersTableProps) {
               />
             </PopoverContent>
           </Popover>
-          
+
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -177,7 +193,9 @@ export function OrdersTable({ items }: OrdersTableProps) {
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateTo ? format(dateTo, "dd MMM yyyy", { locale: ro }) : "Până la"}
+                {dateTo
+                  ? format(dateTo, "dd MMM yyyy", { locale: ro })
+                  : "Până la"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0 bg-popover" align="start">
@@ -185,7 +203,7 @@ export function OrdersTable({ items }: OrdersTableProps) {
                 mode="single"
                 selected={dateTo}
                 onSelect={(date) => {
-                  setDateTo(date);
+                  onDateToChange(date);
                   setCurrentPage(1);
                 }}
                 initialFocus
@@ -194,14 +212,14 @@ export function OrdersTable({ items }: OrdersTableProps) {
               />
             </PopoverContent>
           </Popover>
-          
+
           {(dateFrom || dateTo) && (
             <Button variant="ghost" size="sm" onClick={clearDateFilters}>
               <X className="h-4 w-4 mr-1" />
               Șterge filtre
             </Button>
           )}
-          
+
           <span className="text-sm text-muted-foreground ml-auto">
             {filteredItems.length} rezultate
           </span>
@@ -225,16 +243,24 @@ export function OrdersTable({ items }: OrdersTableProps) {
             <TableBody>
               {paginatedItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                  <TableCell
+                    colSpan={8}
+                    className="text-center text-muted-foreground py-8"
+                  >
                     Nu există date încă. Sincronizează comenzile din EasySales.
                   </TableCell>
                 </TableRow>
               ) : (
                 paginatedItems.map((item) => (
-                  <TableRow key={item.id} className="hover:bg-muted/50 transition-colors">
+                  <TableRow
+                    key={item.id}
+                    className="hover:bg-muted/50 transition-colors"
+                  >
                     <TableCell className="text-muted-foreground">
                       {item.orders?.order_date
-                        ? format(new Date(item.orders.order_date), "dd MMM yyyy", { locale: ro })
+                        ? format(new Date(item.orders.order_date), "dd MMM yyyy", {
+                            locale: ro,
+                          })
                         : "-"}
                     </TableCell>
                     <TableCell>
@@ -245,7 +271,9 @@ export function OrdersTable({ items }: OrdersTableProps) {
                     <TableCell className="font-medium">
                       {item.orders?.customer_name || "-"}
                     </TableCell>
-                    <TableCell className="font-medium">{item.product_name}</TableCell>
+                    <TableCell className="font-medium">
+                      {item.product_name}
+                    </TableCell>
                     <TableCell className="font-mono text-muted-foreground">
                       {item.sku}
                     </TableCell>
