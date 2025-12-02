@@ -60,18 +60,18 @@ serve(async (req) => {
     for (const order of orders) {
       const orderId = order.internal_id || order.id || order.order_display_id;
       
-      // Log customer-related fields from first order for debugging
+      // Log fields from first order for debugging
       if (orders.indexOf(order) === 0) {
-        console.log('Customer fields available:', JSON.stringify({
-          customer_name: order.customer_name,
-          billing_name: order.billing_name,
-          billing_first_name: order.billing_first_name,
-          billing_last_name: order.billing_last_name,
-          shipping_name: order.shipping_name,
-          customer: order.customer,
-          client: order.client,
-          buyer_name: order.buyer_name,
-          contact_name: order.contact_name,
+        console.log('First order ALL FIELDS:', JSON.stringify(order));
+        console.log('Shipping/Discount fields:', JSON.stringify({
+          shipping_price: order.shipping_price,
+          shipping_cost: order.shipping_cost,
+          shipping: order.shipping,
+          delivery_price: order.delivery_price,
+          discount: order.discount,
+          total_discount: order.total_discount,
+          extra_discount: order.extra_discount,
+          voucher_discount: order.voucher_discount,
         }));
       }
       
