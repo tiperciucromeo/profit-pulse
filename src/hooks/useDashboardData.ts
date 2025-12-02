@@ -138,11 +138,18 @@ export function useDashboardData() {
         .select(`
           *,
           orders!inner(easysales_order_id, order_date)
-        `)
-        .order("orders(order_date)", { ascending: false });
+        `);
 
       if (error) throw error;
-      return data || [];
+      
+      // Sort by order_date descending (most recent first)
+      const sorted = (data || []).sort((a, b) => {
+        const dateA = new Date((a.orders as any)?.order_date || 0).getTime();
+        const dateB = new Date((b.orders as any)?.order_date || 0).getTime();
+        return dateB - dateA;
+      });
+      
+      return sorted;
     },
   });
 
