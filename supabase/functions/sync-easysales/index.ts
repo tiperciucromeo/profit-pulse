@@ -6,6 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Romanian VAT rate
+const VAT_RATE = 0.21;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -52,6 +55,7 @@ serve(async (req) => {
       .select('sku, production_cost');
 
     const costMap = new Map(productCosts?.map(p => [p.sku, p.production_cost]) || []);
+    console.log(`Loaded ${costMap.size} product costs from database`);
 
     for (const order of orders) {
       const orderId = order.internal_id || order.id || order.order_display_id;
@@ -72,7 +76,12 @@ serve(async (req) => {
       const totalItems = items.reduce((sum: number, item: any) => sum + (parseInt(item.quantity) || 1), 0) || 1;
       const shippingCost = parseFloat(order.shipping_price || order.shipping_cost || 0);
       const discountAmount = parseFloat(order.discount || order.total_discount || 0);
-      const adjustmentPerItem = (shippingCost + discountAmount) / totalItems;
+      
+      // Per-item adjustment: (shipping - discount) / total items
+      // Positive adjustment = shipping adds to cost, negative = discount reduces revenue
+      const adjustmentPerItem = (shippingCost - discountAmount) / totalItems;
+
+      console.log(`Order ${orderId}: shipping=${shippingCost}, discount=${discountAmount}, items=${totalItems}, adjustment/item=${adjustmentPerItem}`);
 
       // Insert order
       const { data: newOrder, error: orderError } = await supabase
@@ -97,36 +106,33 @@ serve(async (req) => {
       // Insert order items
       for (const item of items) {
         const sku = item.sku || item.product_sku || '';
-        // Log ALL item fields to find the correct price with VAT
-        console.log(`Product ${sku} ALL FIELDS:`, JSON.stringify(item));
         
-        // Try to find the price with VAT - check all possible fields
-        // In Romania, the displayed price should include 19% VAT
-        const priceWithVat = parseFloat(
-          item.price_with_vat || 
-          item.final_price || 
-          item.total_price || 
-          item.unit_price_with_vat ||
-          item.price ||
-          0
-        );
+        // Log item fields for debugging
+        console.log(`Product ${sku} fields: price=${item.price}, sale_price=${item.sale_price}, final_price=${item.final_price}`);
         
-        // If no VAT-inclusive price found, calculate from sale_price (net) * 1.19
-        const salePrice = priceWithVat > 0 ? priceWithVat : Math.round(parseFloat(item.sale_price || 0) * 1.19 * 100) / 100;
+        // Get the base price (without VAT) from EasySales
+        // EasySales typically provides net prices
+        const netPrice = parseFloat(item.sale_price || item.price || item.final_price || 0);
+        
+        // Calculate price with 21% VAT
+        const salePriceWithVat = Math.round(netPrice * (1 + VAT_RATE) * 100) / 100;
+        
         const quantity = parseInt(item.quantity || 1);
         const productionCost = costMap.get(sku) || 0;
         
-        console.log(`Product ${sku}: calculated_sale_price=${salePrice}`);
+        console.log(`Product ${sku}: net=${netPrice}, withVAT=${salePriceWithVat}, prodCost=${productionCost}`);
 
         for (let i = 0; i < quantity; i++) {
-          const realRevenue = salePrice - adjustmentPerItem;
+          // Real revenue = sale price with VAT + shipping share - discount share
+          // Using the adjustment: positive means shipping adds revenue, discount subtracts
+          const realRevenue = salePriceWithVat + adjustmentPerItem;
           const netProfit = realRevenue - productionCost;
 
           await supabase.from('order_items').insert({
             order_id: newOrder.id,
             sku: sku,
             product_name: item.name || item.product_name || 'Unknown Product',
-            sale_price: salePrice,
+            sale_price: salePriceWithVat,
             production_cost: productionCost,
             real_revenue: realRevenue,
             net_profit: netProfit,
