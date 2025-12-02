@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      monthly_expenses: {
+        Row: {
+          created_at: string
+          easysale: number
+          employee_costs: number
+          facebook_ads: number
+          fan_curier: number
+          google_ads: number
+          id: string
+          month: string
+          netopia: number
+          sameday: number
+          the_marketer: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          easysale?: number
+          employee_costs?: number
+          facebook_ads?: number
+          fan_curier?: number
+          google_ads?: number
+          id?: string
+          month: string
+          netopia?: number
+          sameday?: number
+          the_marketer?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          easysale?: number
+          employee_costs?: number
+          facebook_ads?: number
+          fan_curier?: number
+          google_ads?: number
+          id?: string
+          month?: string
+          netopia?: number
+          sameday?: number
+          the_marketer?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           created_at: string

@@ -7,6 +7,7 @@ import { ProfitChart } from "@/components/dashboard/ProfitChart";
 import { TopProductsChart } from "@/components/dashboard/TopProductsChart";
 import { OrdersTable } from "@/components/dashboard/OrdersTable";
 import { SyncPanel } from "@/components/dashboard/SyncPanel";
+import { ExpensesPanel } from "@/components/dashboard/ExpensesPanel";
 import { useDashboardData } from "@/hooks/useDashboardData";
 
 const Index = () => {
@@ -103,6 +104,14 @@ const Index = () => {
     return "Toate comenzile";
   }, [dateFrom, dateTo]);
 
+  // Get selected month for expenses (from dateFrom or current month)
+  const selectedMonth = useMemo(() => {
+    if (dateFrom) {
+      return format(dateFrom, "yyyy-MM");
+    }
+    return format(new Date(), "yyyy-MM");
+  }, [dateFrom]);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -176,6 +185,12 @@ const Index = () => {
           <ProfitChart data={chartData} />
           <TopProductsChart data={topProducts} />
         </div>
+
+        {/* Monthly Expenses Panel */}
+        <ExpensesPanel 
+          selectedMonth={selectedMonth} 
+          totalRevenue={filteredMetrics.totalRevenue} 
+        />
 
         {/* Orders Table */}
         <OrdersTable
