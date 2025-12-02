@@ -17,7 +17,7 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log("Starting cost recalculation (fixing VAT issue)...");
+    console.log("Starting cost recalculation (restoring VAT)...");
 
     // Fetch ALL product costs with pagination
     const costMap = new Map<string, number>();
@@ -53,10 +53,9 @@ serve(async (req) => {
     
     console.log(`Total loaded: ${costMap.size} product costs`);
 
-    // Fetch ALL order_items with pagination
-    // The sale_price was incorrectly multiplied by 1.21 (VAT) during sync
-    // EasySales prices already include VAT, so we need to divide by 1.21 to get correct price
-    const VAT_CORRECTION = 1.21;
+    // EasySales API returns NET prices (without VAT)
+    // We need to add 21% VAT to match EasySales UI which shows WITH VAT
+    const VAT_RATE = 1.21;
     let updatedCount = 0;
     let skippedCount = 0;
     let itemOffset = 0;
@@ -81,21 +80,21 @@ serve(async (req) => {
         const productionCost = costMap.get(item.sku) || 0;
         const adjustment = (item.orders as any)?.adjustment_per_item || 0;
         
-        // Remove the incorrectly added VAT from sale_price
-        // EasySales prices already include VAT, so we divide by 1.21
-        const correctedSalePrice = Math.round((item.sale_price / VAT_CORRECTION) * 100) / 100;
+        // Restore VAT: multiply current sale_price by 1.21
+        // (undoing the previous incorrect division)
+        const salePriceWithVat = Math.round(item.sale_price * VAT_RATE * 100) / 100;
         
-        // real_revenue = corrected sale price + adjustment (shipping - discount per item)
-        const realRevenue = Math.round((correctedSalePrice + adjustment) * 100) / 100;
+        // real_revenue = sale price with VAT + adjustment
+        const realRevenue = Math.round((salePriceWithVat + adjustment) * 100) / 100;
         
         // net_profit = real_revenue - production_cost
         const netProfit = Math.round((realRevenue - productionCost) * 100) / 100;
 
-        // Update the item with corrected values
+        // Update the item
         const { error: updateError } = await supabase
           .from('order_items')
           .update({
-            sale_price: correctedSalePrice,
+            sale_price: salePriceWithVat,
             production_cost: productionCost,
             real_revenue: realRevenue,
             net_profit: netProfit
@@ -127,7 +126,7 @@ serve(async (req) => {
         updated: updatedCount, 
         skipped: skippedCount,
         totalCosts: costMap.size,
-        message: `Fixed VAT and recalculated costs for ${updatedCount} items` 
+        message: `Restored VAT and recalculated costs for ${updatedCount} items` 
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
