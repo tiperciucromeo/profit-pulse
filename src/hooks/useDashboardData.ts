@@ -41,14 +41,31 @@ export function useDashboardData() {
   const metricsQuery = useQuery({
     queryKey: ["dashboard-metrics"],
     queryFn: async (): Promise<DashboardMetrics> => {
-      const { data: items, error } = await supabase
-        .from("order_items")
-        .select("net_profit, real_revenue");
+      // Fetch all order items with pagination
+      const PAGE_SIZE = 1000;
+      let allItems: { net_profit: number; real_revenue: number }[] = [];
+      let page = 0;
+      let hasMore = true;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("order_items")
+          .select("net_profit, real_revenue")
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
-      const totalProfit = items?.reduce((sum, item) => sum + Number(item.net_profit), 0) || 0;
-      const totalRevenue = items?.reduce((sum, item) => sum + Number(item.real_revenue), 0) || 0;
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allItems = [...allItems, ...data];
+          hasMore = data.length === PAGE_SIZE;
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const totalProfit = allItems.reduce((sum, item) => sum + Number(item.net_profit), 0);
+      const totalRevenue = allItems.reduce((sum, item) => sum + Number(item.real_revenue), 0);
 
       const { count: totalOrders } = await supabase
         .from("orders")
@@ -67,22 +84,33 @@ export function useDashboardData() {
   const chartDataQuery = useQuery({
     queryKey: ["dashboard-chart"],
     queryFn: async (): Promise<ChartData[]> => {
-      const { data, error } = await supabase
-        .from("order_items")
-        .select(`
-          net_profit,
-          real_revenue,
-          orders!inner(order_date)
-        `)
-        .order("orders(order_date)", { ascending: true });
+      const PAGE_SIZE = 1000;
+      let allData: { net_profit: number; real_revenue: number; orders: { order_date: string } }[] = [];
+      let page = 0;
+      let hasMore = true;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("order_items")
+          .select("net_profit, real_revenue, orders!inner(order_date)")
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allData = [...allData, ...(data as any)];
+          hasMore = data.length === PAGE_SIZE;
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
 
       // Group by date
       const grouped: Record<string, { profit: number; revenue: number }> = {};
       
-      data?.forEach((item) => {
-        const date = new Date((item.orders as any).order_date).toLocaleDateString("ro-RO", {
+      allData.forEach((item) => {
+        const date = new Date(item.orders.order_date).toLocaleDateString("ro-RO", {
           day: "2-digit",
           month: "short",
         });
@@ -105,16 +133,32 @@ export function useDashboardData() {
   const topProductsQuery = useQuery({
     queryKey: ["top-products"],
     queryFn: async (): Promise<TopProduct[]> => {
-      const { data, error } = await supabase
-        .from("order_items")
-        .select("sku, product_name, net_profit");
+      const PAGE_SIZE = 1000;
+      let allData: { sku: string; product_name: string; net_profit: number }[] = [];
+      let page = 0;
+      let hasMore = true;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("order_items")
+          .select("sku, product_name, net_profit")
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allData = [...allData, ...data];
+          hasMore = data.length === PAGE_SIZE;
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
 
       // Aggregate by SKU
       const byProduct: Record<string, { name: string; profit: number; sku: string }> = {};
       
-      data?.forEach((item) => {
+      allData.forEach((item) => {
         if (!byProduct[item.sku]) {
           byProduct[item.sku] = {
             name: item.product_name,
@@ -134,19 +178,32 @@ export function useDashboardData() {
   const recentItemsQuery = useQuery({
     queryKey: ["recent-items"],
     queryFn: async (): Promise<OrderItem[]> => {
-      const { data, error } = await supabase
-        .from("order_items")
-        .select(`
-          *,
-          orders!inner(easysales_order_id, order_date, customer_name)
-        `);
+      const PAGE_SIZE = 1000;
+      let allData: OrderItem[] = [];
+      let page = 0;
+      let hasMore = true;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("order_items")
+          .select("*, orders!inner(easysales_order_id, order_date, customer_name)")
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allData = [...allData, ...(data as any)];
+          hasMore = data.length === PAGE_SIZE;
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
       
       // Sort by order_date descending (most recent first)
-      const sorted = (data || []).sort((a, b) => {
-        const dateA = new Date((a.orders as any)?.order_date || 0).getTime();
-        const dateB = new Date((b.orders as any)?.order_date || 0).getTime();
+      const sorted = allData.sort((a, b) => {
+        const dateA = new Date(a.orders?.order_date || 0).getTime();
+        const dateB = new Date(b.orders?.order_date || 0).getTime();
         return dateB - dateA;
       });
       
