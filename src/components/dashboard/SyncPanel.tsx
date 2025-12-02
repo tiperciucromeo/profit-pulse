@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RefreshCw, Upload, Settings, CheckCircle2, FileSpreadsheet } from "lucide-react";
+import { RefreshCw, Upload, Settings, CheckCircle2, FileSpreadsheet, Calculator } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -16,6 +16,7 @@ export function SyncPanel({ onSync, isLoading }: SyncPanelProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [googleSheetUrl, setGoogleSheetUrl] = useState("");
   const [isSyncingCosts, setIsSyncingCosts] = useState(false);
+  const [isRecalculating, setIsRecalculating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSyncEasySales = async () => {
@@ -104,6 +105,27 @@ export function SyncPanel({ onSync, isLoading }: SyncPanelProps) {
     }
   };
 
+  const handleRecalculateCosts = async () => {
+    setIsRecalculating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("recalculate-costs");
+      
+      if (error) throw error;
+      
+      toast.success("Costuri recalculate!", {
+        description: `${data?.updated || 0} produse actualizate`,
+      });
+      onSync();
+    } catch (error) {
+      console.error('Recalculate error:', error);
+      toast.error("Eroare la recalculare", {
+        description: "Verifică logurile pentru detalii",
+      });
+    } finally {
+      setIsRecalculating(false);
+    }
+  };
+
   return (
     <Card className="animate-slide-up border-border bg-card" style={{ animationDelay: "100ms" }}>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -117,11 +139,11 @@ export function SyncPanel({ onSync, isLoading }: SyncPanelProps) {
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <Button
             onClick={handleSyncEasySales}
             disabled={isLoading}
-            className="flex-1 gradient-primary text-primary-foreground hover:opacity-90"
+            className="flex-1 min-w-[180px] gradient-primary text-primary-foreground hover:opacity-90"
           >
             {isLoading ? (
               <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
@@ -134,7 +156,7 @@ export function SyncPanel({ onSync, isLoading }: SyncPanelProps) {
             onClick={() => fileInputRef.current?.click()}
             variant="outline"
             disabled={isSyncingCosts}
-            className="flex-1"
+            className="flex-1 min-w-[150px]"
           >
             {isSyncingCosts ? (
               <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
@@ -142,6 +164,19 @@ export function SyncPanel({ onSync, isLoading }: SyncPanelProps) {
               <FileSpreadsheet className="mr-2 h-4 w-4" />
             )}
             Import Costuri CSV
+          </Button>
+          <Button
+            onClick={handleRecalculateCosts}
+            variant="secondary"
+            disabled={isRecalculating}
+            className="flex-1 min-w-[150px]"
+          >
+            {isRecalculating ? (
+              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Calculator className="mr-2 h-4 w-4" />
+            )}
+            Recalculează Costuri
           </Button>
           <input
             ref={fileInputRef}
