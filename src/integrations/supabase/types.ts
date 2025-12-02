@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       monthly_expenses: {
         Row: {
+          alte_cheltuieli: number
           created_at: string
           easysale: number
           employee_costs: number
@@ -30,6 +31,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          alte_cheltuieli?: number
           created_at?: string
           easysale?: number
           employee_costs?: number
@@ -44,6 +46,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          alte_cheltuieli?: number
           created_at?: string
           easysale?: number
           employee_costs?: number

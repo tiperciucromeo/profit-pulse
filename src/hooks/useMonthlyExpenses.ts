@@ -12,6 +12,7 @@ export interface MonthlyExpense {
   google_ads: number;
   facebook_ads: number;
   employee_costs: number;
+  alte_cheltuieli: number;
 }
 
 export function useMonthlyExpenses(month: string) {
