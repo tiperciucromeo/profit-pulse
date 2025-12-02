@@ -97,12 +97,13 @@ serve(async (req) => {
       // Insert order items
       for (const item of items) {
         const sku = item.sku || item.product_sku || '';
-        // Use price with VAT (price field includes VAT, sale_price is without VAT)
-        const salePrice = parseFloat(item.price || item.final_price || item.price_with_vat || item.sale_price || 0);
+        // Get the net price and calculate price with VAT (19% TVA in Romania)
+        const netPrice = parseFloat(item.sale_price || item.price || 0);
+        const salePrice = netPrice * 1.19; // Add 19% TVA
         const quantity = parseInt(item.quantity || 1);
         const productionCost = costMap.get(sku) || 0;
         
-        console.log(`Product ${sku}: price=${item.price}, sale_price=${item.sale_price}, final_price=${item.final_price}`);
+        console.log(`Product ${sku}: net_price=${netPrice}, price_with_vat=${salePrice}`);
 
         for (let i = 0; i < quantity; i++) {
           const realRevenue = salePrice - adjustmentPerItem;
