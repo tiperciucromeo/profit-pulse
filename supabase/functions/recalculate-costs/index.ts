@@ -19,43 +19,63 @@ serve(async (req) => {
 
     console.log("Starting cost recalculation...");
 
-    // Fetch all product costs
-    const { data: productCosts, error: costsError } = await supabase
-      .from('product_costs')
-      .select('sku, production_cost');
-
-    if (costsError) {
-      throw new Error(`Failed to fetch product costs: ${costsError.message}`);
-    }
-
-    // Create a map of SKU -> production_cost
+    // Fetch ALL product costs with pagination (Supabase default limit is 1000)
     const costMap = new Map<string, number>();
-    for (const pc of productCosts || []) {
-      costMap.set(pc.sku, pc.production_cost);
+    let offset = 0;
+    const pageSize = 1000;
+    
+    while (true) {
+      const { data: productCosts, error: costsError } = await supabase
+        .from('product_costs')
+        .select('sku, production_cost')
+        .range(offset, offset + pageSize - 1);
+
+      if (costsError) {
+        throw new Error(`Failed to fetch product costs: ${costsError.message}`);
+      }
+
+      if (!productCosts || productCosts.length === 0) {
+        break;
+      }
+
+      for (const pc of productCosts) {
+        costMap.set(pc.sku, pc.production_cost);
+      }
+
+      console.log(`Loaded ${costMap.size} product costs so far...`);
+      
+      if (productCosts.length < pageSize) {
+        break;
+      }
+      
+      offset += pageSize;
     }
-    console.log(`Loaded ${costMap.size} product costs`);
+    
+    console.log(`Total loaded: ${costMap.size} product costs`);
 
-    // Fetch all order_items with their orders (for adjustment calculation)
-    const { data: orderItems, error: itemsError } = await supabase
-      .from('order_items')
-      .select('id, sku, sale_price, order_id, orders(adjustment_per_item)');
-
-    if (itemsError) {
-      throw new Error(`Failed to fetch order items: ${itemsError.message}`);
-    }
-
-    console.log(`Processing ${orderItems?.length || 0} order items...`);
-
+    // Fetch ALL order_items with pagination
+    const VAT_RATE = 1.21;
     let updatedCount = 0;
     let skippedCount = 0;
-    const VAT_RATE = 1.21;
+    let itemOffset = 0;
+    
+    while (true) {
+      const { data: orderItems, error: itemsError } = await supabase
+        .from('order_items')
+        .select('id, sku, sale_price, order_id, orders(adjustment_per_item)')
+        .range(itemOffset, itemOffset + pageSize - 1);
 
-    // Process in batches
-    const batchSize = 100;
-    for (let i = 0; i < (orderItems?.length || 0); i += batchSize) {
-      const batch = orderItems!.slice(i, i + batchSize);
-      
-      for (const item of batch) {
+      if (itemsError) {
+        throw new Error(`Failed to fetch order items: ${itemsError.message}`);
+      }
+
+      if (!orderItems || orderItems.length === 0) {
+        break;
+      }
+
+      console.log(`Processing batch at offset ${itemOffset}, ${orderItems.length} items...`);
+
+      for (const item of orderItems) {
         const productionCost = costMap.get(item.sku) || 0;
         const adjustment = (item.orders as any)?.adjustment_per_item || 0;
         
@@ -83,7 +103,13 @@ serve(async (req) => {
         }
       }
 
-      console.log(`Progress: ${Math.min(i + batchSize, orderItems!.length)}/${orderItems!.length} items processed`);
+      console.log(`Progress: ${updatedCount + skippedCount} items processed`);
+      
+      if (orderItems.length < pageSize) {
+        break;
+      }
+      
+      itemOffset += pageSize;
     }
 
     console.log(`Recalculation complete. Updated: ${updatedCount}, Skipped: ${skippedCount}`);
@@ -93,7 +119,8 @@ serve(async (req) => {
         success: true, 
         updated: updatedCount, 
         skipped: skippedCount,
-        message: `Recalculated costs for ${updatedCount} items` 
+        totalCosts: costMap.size,
+        message: `Recalculated costs for ${updatedCount} items using ${costMap.size} product costs` 
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
