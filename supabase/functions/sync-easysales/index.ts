@@ -35,12 +35,28 @@ serve(async (req) => {
     const existingOrderIds = new Set(existingOrders?.map(o => o.easysales_order_id) || []);
     console.log(`Found ${existingOrderIds.size} existing orders in database`);
 
-    // Get product costs for profit calculation
-    const { data: productCosts } = await supabase
-      .from('product_costs')
-      .select('sku, production_cost');
+    // Get ALL product costs with pagination
+    let allProductCosts: { sku: string; production_cost: number }[] = [];
+    let costPage = 0;
+    let hasMoreCosts = true;
+    const COST_PAGE_SIZE = 1000;
 
-    const costMap = new Map(productCosts?.map(p => [p.sku, p.production_cost]) || []);
+    while (hasMoreCosts) {
+      const { data: costBatch } = await supabase
+        .from('product_costs')
+        .select('sku, production_cost')
+        .range(costPage * COST_PAGE_SIZE, (costPage + 1) * COST_PAGE_SIZE - 1);
+
+      if (costBatch && costBatch.length > 0) {
+        allProductCosts = [...allProductCosts, ...costBatch];
+        hasMoreCosts = costBatch.length === COST_PAGE_SIZE;
+        costPage++;
+      } else {
+        hasMoreCosts = false;
+      }
+    }
+
+    const costMap = new Map(allProductCosts.map(p => [p.sku, p.production_cost]));
     console.log(`Loaded ${costMap.size} product costs from database`);
 
     const startDate = '2025-08-01';
@@ -48,10 +64,12 @@ serve(async (req) => {
     let hasMorePages = true;
     let totalOrdersProcessed = 0;
     let totalOrdersSkipped = 0;
+    let totalApiOrders = 0;
     
-    // Process page by page instead of fetching all first
+    // Process page by page
     while (hasMorePages) {
-      const url = `https://easy-sales.com/api/v2/orders?per_page=50&status=3&page=${currentPage}&date_from=${startDate}`;
+      // Use per_page=100 for better efficiency
+      const url = `https://easy-sales.com/api/v2/orders?per_page=100&status=3&page=${currentPage}&date_from=${startDate}`;
       console.log(`Fetching page ${currentPage}...`);
       
       const ordersResponse = await fetch(url, {
@@ -72,7 +90,13 @@ serve(async (req) => {
       const ordersData = await ordersResponse.json();
       const pageOrders = ordersData.data || [];
       
-      console.log(`Page ${currentPage}: got ${pageOrders.length} orders`);
+      // Log pagination info if available
+      if (ordersData.meta) {
+        console.log(`Page ${currentPage}: got ${pageOrders.length} orders. Meta: total=${ordersData.meta.total}, last_page=${ordersData.meta.last_page}`);
+        totalApiOrders = ordersData.meta.total || totalApiOrders;
+      } else {
+        console.log(`Page ${currentPage}: got ${pageOrders.length} orders`);
+      }
       
       // Process this page immediately
       for (const order of pageOrders) {
@@ -164,27 +188,31 @@ serve(async (req) => {
         }
       }
       
-      // Check if there are more pages
-      if (pageOrders.length < 50) {
-        hasMorePages = false;
+      // Check if there are more pages using meta info or fallback to count
+      if (ordersData.meta?.last_page) {
+        hasMorePages = currentPage < ordersData.meta.last_page;
       } else {
-        currentPage++;
+        hasMorePages = pageOrders.length === 100;
       }
       
-      // Safety limit
-      if (currentPage > 100) {
-        console.log('Reached page limit (100), stopping');
+      currentPage++;
+      
+      // Safety limit - increase to 200 pages (20,000 orders)
+      if (currentPage > 200) {
+        console.log('Reached page limit (200), stopping');
         hasMorePages = false;
       }
     }
 
     console.log(`Sync complete. ${totalOrdersProcessed} new orders processed, ${totalOrdersSkipped} existing orders skipped.`);
+    console.log(`Total orders in API: ${totalApiOrders}`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         ordersProcessed: totalOrdersProcessed,
-        ordersSkipped: totalOrdersSkipped 
+        ordersSkipped: totalOrdersSkipped,
+        totalApiOrders: totalApiOrders
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
