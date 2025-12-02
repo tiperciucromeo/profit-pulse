@@ -1,4 +1,7 @@
+import { useState, useMemo } from "react";
 import { TrendingUp, DollarSign, Package, Percent } from "lucide-react";
+import { format } from "date-fns";
+import { ro } from "date-fns/locale";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ProfitChart } from "@/components/dashboard/ProfitChart";
 import { TopProductsChart } from "@/components/dashboard/TopProductsChart";
@@ -7,8 +10,74 @@ import { SyncPanel } from "@/components/dashboard/SyncPanel";
 import { useDashboardData } from "@/hooks/useDashboardData";
 
 const Index = () => {
-  const { metrics, chartData, topProducts, recentItems, isLoading, refetch } =
+  const { chartData, topProducts, recentItems, isLoading, refetch } =
     useDashboardData();
+
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
+
+  // Filter items based on selected date range
+  const filteredItems = useMemo(() => {
+    let filtered = recentItems;
+
+    if (dateFrom) {
+      filtered = filtered.filter((item) => {
+        if (!item.orders?.order_date) return false;
+        const orderDate = new Date(item.orders.order_date);
+        return orderDate >= dateFrom;
+      });
+    }
+
+    if (dateTo) {
+      const endOfDay = new Date(dateTo);
+      endOfDay.setHours(23, 59, 59, 999);
+      filtered = filtered.filter((item) => {
+        if (!item.orders?.order_date) return false;
+        const orderDate = new Date(item.orders.order_date);
+        return orderDate <= endOfDay;
+      });
+    }
+
+    return filtered;
+  }, [recentItems, dateFrom, dateTo]);
+
+  // Calculate metrics based on filtered items
+  const filteredMetrics = useMemo(() => {
+    const totalProfit = filteredItems.reduce(
+      (sum, item) => sum + Number(item.net_profit),
+      0
+    );
+    const totalRevenue = filteredItems.reduce(
+      (sum, item) => sum + Number(item.real_revenue),
+      0
+    );
+
+    // Count unique orders
+    const uniqueOrders = new Set(
+      filteredItems.map((item) => item.orders?.easysales_order_id).filter(Boolean)
+    );
+
+    return {
+      totalProfit,
+      totalRevenue,
+      totalOrders: uniqueOrders.size,
+      profitMargin: totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0,
+    };
+  }, [filteredItems]);
+
+  // Format the period subtitle
+  const periodSubtitle = useMemo(() => {
+    if (dateFrom && dateTo) {
+      return `${format(dateFrom, "dd MMM", { locale: ro })} - ${format(dateTo, "dd MMM yyyy", { locale: ro })}`;
+    }
+    if (dateFrom) {
+      return `De la ${format(dateFrom, "dd MMM yyyy", { locale: ro })}`;
+    }
+    if (dateTo) {
+      return `Până la ${format(dateTo, "dd MMM yyyy", { locale: ro })}`;
+    }
+    return "Toate comenzile";
+  }, [dateFrom, dateTo]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -40,30 +109,30 @@ const Index = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <MetricCard
             title="Profit Net Total"
-            value={`${(metrics?.totalProfit || 0).toFixed(2)} RON`}
-            subtitle="Luna curentă"
+            value={`${filteredMetrics.totalProfit.toFixed(2)} RON`}
+            subtitle={periodSubtitle}
             icon={TrendingUp}
             variant="success"
             delay={0}
           />
           <MetricCard
-            title="Venituri Reale"
-            value={`${(metrics?.totalRevenue || 0).toFixed(2)} RON`}
-            subtitle="După ajustări"
+            title="Vânzări"
+            value={`${filteredMetrics.totalRevenue.toFixed(2)} RON`}
+            subtitle={periodSubtitle}
             icon={DollarSign}
             delay={50}
           />
           <MetricCard
             title="Comenzi Procesate"
-            value={String(metrics?.totalOrders || 0)}
-            subtitle="Finalizate"
+            value={String(filteredMetrics.totalOrders)}
+            subtitle={periodSubtitle}
             icon={Package}
             delay={100}
           />
           <MetricCard
             title="Marjă Reală"
-            value={`${(metrics?.profitMargin || 0).toFixed(1)}%`}
-            subtitle="Profit / Venituri"
+            value={`${filteredMetrics.profitMargin.toFixed(1)}%`}
+            subtitle="Profit / Vânzări"
             icon={Percent}
             variant="accent"
             delay={150}
@@ -77,17 +146,25 @@ const Index = () => {
         </div>
 
         {/* Orders Table */}
-        <OrdersTable items={recentItems} />
+        <OrdersTable
+          items={recentItems}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onDateFromChange={setDateFrom}
+          onDateToChange={setDateTo}
+        />
 
         {/* Footer Info */}
         <div className="text-center text-sm text-muted-foreground py-4">
           <p>
-            Formula: <span className="font-mono bg-muted px-2 py-1 rounded">
+            Formula:{" "}
+            <span className="font-mono bg-muted px-2 py-1 rounded">
               Profit = (Preț Vânzare - Reducere/n + Transport/n) - Cost Producție
             </span>
           </p>
           <p className="mt-2">
-            Metoda distribuirii uniforme • Cheltuielile și transportul se împart egal la toate produsele din comandă
+            Metoda distribuirii uniforme • Cheltuielile și transportul se împart
+            egal la toate produsele din comandă
           </p>
         </div>
       </main>
