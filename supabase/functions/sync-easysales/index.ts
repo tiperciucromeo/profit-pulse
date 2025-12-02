@@ -12,22 +12,20 @@ serve(async (req) => {
   }
 
   try {
-    const clientId = Deno.env.get('EASYSALES_CLIENT_ID');
-    const clientSecret = Deno.env.get('EASYSALES_CLIENT_SECRET');
     const websiteToken = Deno.env.get('EASYSALES_WEBSITE_TOKEN');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    if (!clientId || !clientSecret || !websiteToken) {
-      throw new Error('Missing EasySales credentials');
+    if (!websiteToken) {
+      throw new Error('Missing EasySales website token');
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     console.log('Fetching orders from EasySales API...');
 
-    // Fetch orders from EasySales API
-    const ordersResponse = await fetch('https://app.easysales.ro/api/orders', {
+    // Fetch orders from EasySales API - correct URL
+    const ordersResponse = await fetch('https://easy-sales.com/api/v2/orders?per_page=100&status=3', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${websiteToken}`,
@@ -38,14 +36,14 @@ serve(async (req) => {
 
     if (!ordersResponse.ok) {
       const errorText = await ordersResponse.text();
-      console.error('EasySales API error:', errorText);
-      throw new Error(`EasySales API error: ${ordersResponse.status}`);
+      console.error('EasySales API error:', ordersResponse.status, errorText);
+      throw new Error(`EasySales API error: ${ordersResponse.status} - ${errorText}`);
     }
 
     const ordersData = await ordersResponse.json();
-    console.log('Orders fetched:', ordersData);
+    console.log('Orders response:', JSON.stringify(ordersData).substring(0, 500));
 
-    const orders = ordersData.data || ordersData || [];
+    const orders = ordersData.data || [];
     let ordersProcessed = 0;
 
     // Get product costs for profit calculation
@@ -56,35 +54,37 @@ serve(async (req) => {
     const costMap = new Map(productCosts?.map(p => [p.sku, p.production_cost]) || []);
 
     for (const order of orders) {
+      const orderId = order.internal_id || order.id || order.order_display_id;
+      
       // Check if order already exists
       const { data: existingOrder } = await supabase
         .from('orders')
         .select('id')
-        .eq('easysales_order_id', String(order.id))
+        .eq('easysales_order_id', String(orderId))
         .single();
 
       if (existingOrder) {
-        console.log(`Order ${order.id} already exists, skipping`);
+        console.log(`Order ${orderId} already exists, skipping`);
         continue;
       }
 
-      const items = order.products || order.items || [];
-      const totalItems = items.length || 1;
+      const items = order.products || [];
+      const totalItems = items.reduce((sum: number, item: any) => sum + (parseInt(item.quantity) || 1), 0) || 1;
       const shippingCost = parseFloat(order.shipping_price || order.shipping_cost || 0);
-      const discountAmount = parseFloat(order.discount || order.discount_amount || 0);
+      const discountAmount = parseFloat(order.discount || order.total_discount || 0);
       const adjustmentPerItem = (shippingCost + discountAmount) / totalItems;
 
       // Insert order
       const { data: newOrder, error: orderError } = await supabase
         .from('orders')
         .insert({
-          easysales_order_id: String(order.id),
-          order_date: order.created_at || order.date || new Date().toISOString(),
+          easysales_order_id: String(orderId),
+          order_date: order.order_date || order.created_at || new Date().toISOString(),
           shipping_cost: shippingCost,
           discount_amount: discountAmount,
           total_items: totalItems,
           adjustment_per_item: adjustmentPerItem,
-          status: order.status || 'processed',
+          status: 'processed',
         })
         .select()
         .single();
@@ -97,7 +97,7 @@ serve(async (req) => {
       // Insert order items
       for (const item of items) {
         const sku = item.sku || item.product_sku || '';
-        const salePrice = parseFloat(item.price || item.sale_price || 0);
+        const salePrice = parseFloat(item.sale_price || item.price || 0);
         const quantity = parseInt(item.quantity || 1);
         const productionCost = costMap.get(sku) || 0;
 
@@ -118,6 +118,7 @@ serve(async (req) => {
       }
 
       ordersProcessed++;
+      console.log(`Processed order ${orderId}`);
     }
 
     console.log(`Sync complete. ${ordersProcessed} orders processed.`);
