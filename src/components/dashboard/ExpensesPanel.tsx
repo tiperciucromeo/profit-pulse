@@ -37,8 +37,9 @@ export function ExpensesPanel({ selectedMonth, totalRevenue }: ExpensesPanelProp
     employee_costs: 0,
   });
 
-  // Calculate VAT (21% of total revenue)
-  const calculatedVAT = totalRevenue * 0.21;
+  // Calculate VAT extracted from price (revenue includes VAT)
+  // Formula: VAT = Revenue / 1.21 * 0.21
+  const calculatedVAT = (totalRevenue / 1.21) * 0.21;
 
   // Load saved values when expenses change
   useEffect(() => {
