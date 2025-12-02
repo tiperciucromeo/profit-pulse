@@ -152,20 +152,20 @@ serve(async (req) => {
         const orderItems: any[] = [];
         for (const item of items) {
           const sku = item.sku || item.product_sku || '';
-          const netPrice = parseFloat(item.sale_price || item.price || item.final_price || 0);
-          const salePriceWithVat = Math.round(netPrice * (1 + VAT_RATE) * 100) / 100;
+          // EasySales prices already include VAT, no need to add it
+          const salePrice = Math.round(parseFloat(item.sale_price || item.price || item.final_price || 0) * 100) / 100;
           const quantity = parseInt(item.quantity || 1);
           const productionCost = costMap.get(sku) || 0;
 
           for (let i = 0; i < quantity; i++) {
-            const realRevenue = salePriceWithVat + adjustmentPerItem;
+            const realRevenue = salePrice + adjustmentPerItem;
             const netProfit = realRevenue - productionCost;
 
             orderItems.push({
               order_id: newOrder.id,
               sku: sku,
               product_name: item.name || item.product_name || 'Unknown Product',
-              sale_price: salePriceWithVat,
+              sale_price: salePrice,
               production_cost: productionCost,
               real_revenue: realRevenue,
               net_profit: netProfit,
