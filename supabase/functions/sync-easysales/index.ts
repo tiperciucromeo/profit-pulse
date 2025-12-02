@@ -97,24 +97,26 @@ serve(async (req) => {
       // Insert order items
       for (const item of items) {
         const sku = item.sku || item.product_sku || '';
-        // Log all price fields to find the correct one with VAT
-        console.log(`Product ${sku} price fields:`, JSON.stringify({
-          price: item.price,
-          sale_price: item.sale_price,
-          final_price: item.final_price,
-          price_with_vat: item.price_with_vat,
-          total_price: item.total_price,
-          unit_price: item.unit_price
-        }));
+        // Log ALL item fields to find the correct price with VAT
+        console.log(`Product ${sku} ALL FIELDS:`, JSON.stringify(item));
         
-        // Use "price" field which should be the full price with VAT
-        // If not available, fall back to sale_price * 1.19
-        const priceWithVat = parseFloat(item.price || item.final_price || item.price_with_vat || 0);
-        const salePrice = priceWithVat > 0 ? priceWithVat : parseFloat(item.sale_price || 0) * 1.19;
+        // Try to find the price with VAT - check all possible fields
+        // In Romania, the displayed price should include 19% VAT
+        const priceWithVat = parseFloat(
+          item.price_with_vat || 
+          item.final_price || 
+          item.total_price || 
+          item.unit_price_with_vat ||
+          item.price ||
+          0
+        );
+        
+        // If no VAT-inclusive price found, calculate from sale_price (net) * 1.19
+        const salePrice = priceWithVat > 0 ? priceWithVat : Math.round(parseFloat(item.sale_price || 0) * 1.19 * 100) / 100;
         const quantity = parseInt(item.quantity || 1);
         const productionCost = costMap.get(sku) || 0;
         
-        console.log(`Product ${sku}: final_sale_price_with_vat=${salePrice}`);
+        console.log(`Product ${sku}: calculated_sale_price=${salePrice}`);
 
         for (let i = 0; i < quantity; i++) {
           const realRevenue = salePrice - adjustmentPerItem;
