@@ -16,26 +16,43 @@ const Index = () => {
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
 
-  // Filter items based on selected date range
+  // Helper to get UTC date string (YYYY-MM-DD) to match EasySales filtering
+  const getUTCDateString = (date: Date) => {
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Filter items based on selected date range (using UTC to match EasySales)
   const filteredItems = useMemo(() => {
     let filtered = recentItems;
 
     if (dateFrom) {
-      // Compare only the date part (YYYY-MM-DD) to avoid timezone issues
-      const fromDateStr = dateFrom.toISOString().split('T')[0];
+      // Use local date from picker but compare against UTC dates from DB
+      const year = dateFrom.getFullYear();
+      const month = String(dateFrom.getMonth() + 1).padStart(2, '0');
+      const day = String(dateFrom.getDate()).padStart(2, '0');
+      const fromDateStr = `${year}-${month}-${day}`;
+      
       filtered = filtered.filter((item) => {
         if (!item.orders?.order_date) return false;
-        const orderDateStr = new Date(item.orders.order_date).toISOString().split('T')[0];
+        const orderDate = new Date(item.orders.order_date);
+        const orderDateStr = getUTCDateString(orderDate);
         return orderDateStr >= fromDateStr;
       });
     }
 
     if (dateTo) {
-      // Compare only the date part (YYYY-MM-DD) to avoid timezone issues
-      const toDateStr = dateTo.toISOString().split('T')[0];
+      const year = dateTo.getFullYear();
+      const month = String(dateTo.getMonth() + 1).padStart(2, '0');
+      const day = String(dateTo.getDate()).padStart(2, '0');
+      const toDateStr = `${year}-${month}-${day}`;
+      
       filtered = filtered.filter((item) => {
         if (!item.orders?.order_date) return false;
-        const orderDateStr = new Date(item.orders.order_date).toISOString().split('T')[0];
+        const orderDate = new Date(item.orders.order_date);
+        const orderDateStr = getUTCDateString(orderDate);
         return orderDateStr <= toDateStr;
       });
     }
