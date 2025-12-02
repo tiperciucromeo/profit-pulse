@@ -57,14 +57,28 @@ serve(async (req) => {
     const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim());
     console.log('Headers found:', headers);
 
-    const skuIndex = headers.findIndex(h => h.includes('sku') || h.includes('cod'));
-    const nameIndex = headers.findIndex(h => h.includes('nume') || h.includes('name') || h.includes('produs'));
-    const costIndex = headers.findIndex(h => h.includes('cost') || h.includes('pret') || h.includes('price'));
+    // Look for SKU column: "cod produs", "cod", "sku"
+    const skuIndex = headers.findIndex(h => 
+      h.includes('cod produs') || h.includes('cod') || h.includes('sku')
+    );
+    
+    // Look for name column: first column or one containing "nume", "name", "produs"
+    let nameIndex = headers.findIndex(h => 
+      h.includes('nume') || h.includes('name') || h.includes('denumire')
+    );
+    // If no name column found, use first column (often the product name)
+    if (nameIndex === -1) nameIndex = 0;
+    
+    // Look for cost column: "pret productie", "cost productie", "cost"
+    const costIndex = headers.findIndex(h => 
+      h.includes('pret productie') || h.includes('cost productie') || 
+      h.includes('production') || (h.includes('cost') && !h.includes('reducere'))
+    );
 
     console.log(`Column indices - SKU: ${skuIndex}, Name: ${nameIndex}, Cost: ${costIndex}`);
 
     if (skuIndex === -1 || costIndex === -1) {
-      throw new Error(`Could not find required columns. Headers found: ${headers.join(', ')}. Need columns containing: sku/cod, cost/pret`);
+      throw new Error(`Nu am găsit coloanele necesare. Coloane găsite: ${headers.join(', ')}. Am nevoie de: "Cod Produs" și "Pret Productie"`);
     }
 
     let productsUpdated = 0;
