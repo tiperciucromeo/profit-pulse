@@ -11,9 +11,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { format } from "date-fns";
 import { ro } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, CalendarIcon, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface OrderItem {
   id: string;
@@ -39,38 +46,59 @@ const ITEMS_PER_PAGE = 20;
 export function OrdersTable({ items }: OrdersTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
   
   const filteredItems = useMemo(() => {
-    if (!searchQuery.trim()) return items;
-    const query = searchQuery.toLowerCase();
-    return items.filter(item => 
-      item.orders?.easysales_order_id?.toLowerCase().includes(query)
-    );
-  }, [items, searchQuery]);
+    let filtered = items;
+    
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(item => 
+        item.orders?.easysales_order_id?.toLowerCase().includes(query)
+      );
+    }
+    
+    // Filter by date range
+    if (dateFrom) {
+      filtered = filtered.filter(item => {
+        if (!item.orders?.order_date) return false;
+        const orderDate = new Date(item.orders.order_date);
+        return orderDate >= dateFrom;
+      });
+    }
+    
+    if (dateTo) {
+      const endOfDay = new Date(dateTo);
+      endOfDay.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(item => {
+        if (!item.orders?.order_date) return false;
+        const orderDate = new Date(item.orders.order_date);
+        return orderDate <= endOfDay;
+      });
+    }
+    
+    return filtered;
+  }, [items, searchQuery, dateFrom, dateTo]);
   
   const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedItems = filteredItems.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
+  const clearDateFilters = () => {
+    setDateFrom(undefined);
+    setDateTo(undefined);
+    setCurrentPage(1);
+  };
+
   return (
     <Card className="animate-slide-up border-border bg-card" style={{ animationDelay: "400ms" }}>
-      <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <CardTitle className="text-lg font-semibold">
-          Ultimele Produse Procesate
-        </CardTitle>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="relative w-full sm:w-auto">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Caută după nr. comandă..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="pl-9 w-full sm:w-[200px]"
-            />
-          </div>
+      <CardHeader className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <CardTitle className="text-lg font-semibold">
+            Ultimele Produse Procesate
+          </CardTitle>
           {totalPages > 1 && (
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">
@@ -94,6 +122,88 @@ export function OrdersTable({ items }: OrdersTableProps) {
               </Button>
             </div>
           )}
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Caută după nr. comandă..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="pl-9 w-[180px]"
+            />
+          </div>
+          
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-[140px] justify-start text-left font-normal",
+                  !dateFrom && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateFrom ? format(dateFrom, "dd MMM yyyy", { locale: ro }) : "De la"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 bg-popover" align="start">
+              <Calendar
+                mode="single"
+                selected={dateFrom}
+                onSelect={(date) => {
+                  setDateFrom(date);
+                  setCurrentPage(1);
+                }}
+                initialFocus
+                className="p-3 pointer-events-auto"
+                locale={ro}
+              />
+            </PopoverContent>
+          </Popover>
+          
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-[140px] justify-start text-left font-normal",
+                  !dateTo && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateTo ? format(dateTo, "dd MMM yyyy", { locale: ro }) : "Până la"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 bg-popover" align="start">
+              <Calendar
+                mode="single"
+                selected={dateTo}
+                onSelect={(date) => {
+                  setDateTo(date);
+                  setCurrentPage(1);
+                }}
+                initialFocus
+                className="p-3 pointer-events-auto"
+                locale={ro}
+              />
+            </PopoverContent>
+          </Popover>
+          
+          {(dateFrom || dateTo) && (
+            <Button variant="ghost" size="sm" onClick={clearDateFilters}>
+              <X className="h-4 w-4 mr-1" />
+              Șterge filtre
+            </Button>
+          )}
+          
+          <span className="text-sm text-muted-foreground ml-auto">
+            {filteredItems.length} rezultate
+          </span>
         </div>
       </CardHeader>
       <CardContent>
