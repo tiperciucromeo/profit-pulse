@@ -33,6 +33,7 @@ export interface OrderItem {
   orders?: {
     easysales_order_id: string;
     order_date: string;
+    customer_name: string | null;
   };
 }
 
@@ -137,7 +138,7 @@ export function useDashboardData() {
         .from("order_items")
         .select(`
           *,
-          orders!inner(easysales_order_id, order_date)
+          orders!inner(easysales_order_id, order_date, customer_name)
         `);
 
       if (error) throw error;

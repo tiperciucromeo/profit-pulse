@@ -62,6 +62,7 @@ export type Database = {
         Row: {
           adjustment_per_item: number
           created_at: string
+          customer_name: string | null
           discount_amount: number
           easysales_order_id: string
           id: string
@@ -73,6 +74,7 @@ export type Database = {
         Insert: {
           adjustment_per_item?: number
           created_at?: string
+          customer_name?: string | null
           discount_amount?: number
           easysales_order_id: string
           id?: string
@@ -84,6 +86,7 @@ export type Database = {
         Update: {
           adjustment_per_item?: number
           created_at?: string
+          customer_name?: string | null
           discount_amount?: number
           easysales_order_id?: string
           id?: string

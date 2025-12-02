@@ -83,6 +83,11 @@ serve(async (req) => {
 
       console.log(`Order ${orderId}: shipping=${shippingCost}, discount=${discountAmount}, items=${totalItems}, adjustment/item=${adjustmentPerItem}`);
 
+      // Extract customer name from order
+      const customerName = order.customer_name || order.billing_name || 
+        `${order.billing_first_name || ''} ${order.billing_last_name || ''}`.trim() || 
+        order.shipping_name || 'N/A';
+
       // Insert order
       const { data: newOrder, error: orderError } = await supabase
         .from('orders')
@@ -94,6 +99,7 @@ serve(async (req) => {
           total_items: totalItems,
           adjustment_per_item: adjustmentPerItem,
           status: 'processed',
+          customer_name: customerName,
         })
         .select()
         .single();

@@ -34,6 +34,7 @@ interface OrderItem {
   orders?: {
     easysales_order_id: string;
     order_date: string;
+    customer_name: string | null;
   };
 }
 
@@ -213,6 +214,7 @@ export function OrdersTable({ items }: OrdersTableProps) {
               <TableRow>
                 <TableHead>Data</TableHead>
                 <TableHead>Comandă</TableHead>
+                <TableHead>Client</TableHead>
                 <TableHead>Produs</TableHead>
                 <TableHead>SKU</TableHead>
                 <TableHead className="text-right">Preț Vânzare</TableHead>
@@ -224,7 +226,7 @@ export function OrdersTable({ items }: OrdersTableProps) {
             <TableBody>
               {paginatedItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                     Nu există date încă. Sincronizează comenzile din EasySales.
                   </TableCell>
                 </TableRow>
@@ -240,6 +242,9 @@ export function OrdersTable({ items }: OrdersTableProps) {
                       <Badge variant="outline" className="font-mono">
                         #{item.orders?.easysales_order_id || "-"}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {item.orders?.customer_name || "-"}
                     </TableCell>
                     <TableCell className="font-medium">{item.product_name}</TableCell>
                     <TableCell className="font-mono text-muted-foreground">
