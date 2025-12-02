@@ -24,8 +24,8 @@ serve(async (req) => {
 
     console.log('Fetching orders from EasySales API...');
 
-    // Fetch only "Finalizate" (Completed) orders - status=4 in EasySales
-    const ordersResponse = await fetch('https://easy-sales.com/api/v2/orders?per_page=100&status=4', {
+    // Fetch "Finalizate" (Completed) orders - status=3 in EasySales
+    const ordersResponse = await fetch('https://easy-sales.com/api/v2/orders?per_page=100&status=3', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${websiteToken}`,
