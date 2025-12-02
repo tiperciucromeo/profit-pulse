@@ -92,14 +92,25 @@ serve(async (req) => {
 
       const items = order.products || [];
       const totalItems = items.reduce((sum: number, item: any) => sum + (parseInt(item.quantity) || 1), 0) || 1;
-      const shippingCost = parseFloat(order.shipping_price || order.shipping_cost || 0);
-      const discountAmount = parseFloat(order.discount || order.total_discount || 0);
       
-      // Per-item adjustment: (shipping - discount) / total items
-      // Positive adjustment = shipping adds to cost, negative = discount reduces revenue
-      const adjustmentPerItem = (shippingCost - discountAmount) / totalItems;
+      // Extract shipping and discount from charges[] array
+      const charges = order.charges || [];
+      const shippingCharge = charges.find((c: any) => c.type === 'shipping');
+      const discountCharge = charges.find((c: any) => c.type === 'discount');
+      
+      // Get shipping cost (positive value)
+      const shippingCost = shippingCharge ? Math.abs(parseFloat(shippingCharge.price_with_tax || 0)) : 0;
+      
+      // Get discount amount (stored as negative in EasySales, we need positive value)
+      const discountAmount = discountCharge ? Math.abs(parseFloat(discountCharge.price_with_tax || 0)) : 0;
+      
+      // Per-item adjustment: (shipping / total items) - (discount / total items)
+      // Shipping adds to price, discount subtracts from price
+      const shippingPerItem = shippingCost / totalItems;
+      const discountPerItem = discountAmount / totalItems;
+      const adjustmentPerItem = shippingPerItem - discountPerItem;
 
-      console.log(`Order ${orderId}: shipping=${shippingCost}, discount=${discountAmount}, items=${totalItems}, adjustment/item=${adjustmentPerItem}`);
+      console.log(`Order ${orderId}: shipping=${shippingCost}, discount=${discountAmount}, items=${totalItems}, shippingPerItem=${shippingPerItem}, discountPerItem=${discountPerItem}, adjustment/item=${adjustmentPerItem}`);
 
       // Insert order
       const { data: newOrder, error: orderError } = await supabase
