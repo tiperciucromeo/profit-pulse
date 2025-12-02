@@ -1,1 +1,7 @@
 project_id = "qduhlfqsgumuhkjjyutc"
+
+[functions.sync-easysales]
+verify_jwt = false
+
+[functions.sync-costs]
+verify_jwt = false
