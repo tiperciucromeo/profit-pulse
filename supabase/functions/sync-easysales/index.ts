@@ -123,9 +123,7 @@ serve(async (req) => {
         const shippingCost = shippingCharge ? Math.abs(parseFloat(shippingCharge.price_with_tax || 0)) : 0;
         const discountAmount = discountCharge ? Math.abs(parseFloat(discountCharge.price_with_tax || 0)) : 0;
         
-        const shippingPerItem = shippingCost / totalItems;
-        const discountPerItem = discountAmount / totalItems;
-        const adjustmentPerItem = shippingPerItem - discountPerItem;
+        const adjustmentPerItem = Math.round(((shippingCost - discountAmount) / totalItems) * 100) / 100;
 
         // Insert order
         const { data: newOrder, error: orderError } = await supabase
@@ -160,8 +158,8 @@ serve(async (req) => {
           const productionCost = costMap.get(sku) || 0;
 
           for (let i = 0; i < quantity; i++) {
-            const realRevenue = salePriceWithVat + adjustmentPerItem;
-            const netProfit = realRevenue - productionCost;
+            const realRevenue = Math.round((salePriceWithVat + adjustmentPerItem) * 100) / 100;
+            const netProfit = Math.round((realRevenue - productionCost) * 100) / 100;
 
             orderItems.push({
               order_id: newOrder.id,

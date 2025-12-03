@@ -151,7 +151,7 @@ serve(async (req) => {
       }
 
       if (orderChanged) {
-        const adjustmentPerItem = (newShippingCost - newDiscountAmount) / totalItems;
+        const adjustmentPerItem = Math.round(((newShippingCost - newDiscountAmount) / totalItems) * 100) / 100;
         
         await supabase
           .from('orders')
@@ -169,7 +169,7 @@ serve(async (req) => {
       // Delete and re-insert items
       await supabase.from('order_items').delete().eq('order_id', order.id);
 
-      const adjustmentPerItem = (newShippingCost - newDiscountAmount) / totalItems;
+      const adjustmentPerItem = Math.round(((newShippingCost - newDiscountAmount) / totalItems) * 100) / 100;
       const orderItems: any[] = [];
       
       for (const item of items) {
@@ -180,8 +180,8 @@ serve(async (req) => {
         const productionCost = costMap.get(sku) || 0;
 
         for (let i = 0; i < quantity; i++) {
-          const realRevenue = salePriceWithVat + adjustmentPerItem;
-          const netProfit = realRevenue - productionCost;
+          const realRevenue = Math.round((salePriceWithVat + adjustmentPerItem) * 100) / 100;
+          const netProfit = Math.round((realRevenue - productionCost) * 100) / 100;
 
           orderItems.push({
             order_id: order.id,
