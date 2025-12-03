@@ -150,10 +150,9 @@ serve(async (req) => {
         const orderItems: any[] = [];
         for (const item of items) {
           const sku = item.sku || item.product_sku || '';
-          // EasySales API returns NET prices (without VAT)
-          // Multiply by 1.21 to get GROSS prices (with 21% VAT) - same as EasySales UI
-          const netPrice = parseFloat(item.sale_price || item.price || item.final_price || 0);
-          const salePriceWithVat = Math.round(netPrice * (1 + VAT_RATE) * 100) / 100;
+          // Use price_with_tax directly from EasySales if available, otherwise calculate
+          const salePriceWithVat = parseFloat(item.price_with_tax || item.final_price_with_tax || item.sale_price_with_tax || 0) ||
+            Math.round(parseFloat(item.sale_price || item.price || item.final_price || 0) * (1 + VAT_RATE) * 100) / 100;
           const quantity = parseInt(item.quantity || 1);
           const productionCost = costMap.get(sku) || 0;
 
