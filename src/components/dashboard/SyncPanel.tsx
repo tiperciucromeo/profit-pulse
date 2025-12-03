@@ -18,6 +18,7 @@ export function SyncPanel({ onSync, isLoading }: SyncPanelProps) {
   const [isSyncingCosts, setIsSyncingCosts] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [isResyncing, setIsResyncing] = useState(false);
+  const [resyncMonth, setResyncMonth] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSyncEasySales = async () => {
@@ -127,18 +128,20 @@ export function SyncPanel({ onSync, isLoading }: SyncPanelProps) {
     }
   };
 
-  const handleResyncOrders = async () => {
+  const handleResyncOrders = async (month?: string) => {
     setIsResyncing(true);
     toast.info("Re-sincronizare în curs...", {
-      description: "Acest proces poate dura câteva minute",
+      description: month ? `Luna ${month}` : "Toate comenzile - poate dura câteva minute",
     });
     try {
-      const { data, error } = await supabase.functions.invoke("resync-orders");
+      const { data, error } = await supabase.functions.invoke("resync-orders", {
+        body: month ? { month } : {},
+      });
       
       if (error) throw error;
       
       toast.success("Re-sincronizare completă!", {
-        description: `${data?.ordersProcessed || 0} comenzi verificate, ${data?.differences?.length || 0} diferențe găsite`,
+        description: `${data?.ordersProcessed || 0} comenzi verificate, ${data?.itemsUpdated || 0} items actualizate`,
       });
       
       if (data?.differences && data.differences.length > 0) {
@@ -208,19 +211,28 @@ export function SyncPanel({ onSync, isLoading }: SyncPanelProps) {
             )}
             Recalculează Costuri
           </Button>
-          <Button
-            onClick={handleResyncOrders}
-            variant="outline"
-            disabled={isResyncing}
-            className="flex-1 min-w-[150px] border-amber-500/50 text-amber-600 hover:bg-amber-500/10"
-          >
-            {isResyncing ? (
-              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RotateCcw className="mr-2 h-4 w-4" />
-            )}
-            Re-sync Comenzi
-          </Button>
+          <div className="flex items-center gap-2 flex-1 min-w-[250px]">
+            <Input
+              type="month"
+              value={resyncMonth}
+              onChange={(e) => setResyncMonth(e.target.value)}
+              placeholder="YYYY-MM"
+              className="w-[140px]"
+            />
+            <Button
+              onClick={() => handleResyncOrders(resyncMonth || undefined)}
+              variant="outline"
+              disabled={isResyncing}
+              className="border-amber-500/50 text-amber-600 hover:bg-amber-500/10"
+            >
+              {isResyncing ? (
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RotateCcw className="mr-2 h-4 w-4" />
+              )}
+              Re-sync {resyncMonth ? resyncMonth : "Toate"}
+            </Button>
+          </div>
           <input
             ref={fileInputRef}
             type="file"
