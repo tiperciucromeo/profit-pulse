@@ -717,6 +717,15 @@ app.get("/api/invoices/debug", (_req, res) => {
   });
 });
 
+// Servește frontend în producție (după toate route-urile /api)
+if (process.env.NODE_ENV === "production") {
+  const distPath = path.join(__dirname, "dist");
+  if (fs.existsSync(distPath)) {
+    app.use(express.static(distPath));
+    app.get("*", (req, res) => res.sendFile(path.join(distPath, "index.html")));
+  }
+}
+
 app.listen(PORT, () => {
   console.log(`Backend server listening on http://localhost:${PORT}`);
   console.log("Endpoints:");
