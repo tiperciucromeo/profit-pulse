@@ -46,7 +46,7 @@ interface OrdersTableProps {
   onDateToChange: (date: Date | undefined) => void;
 }
 
-const ITEMS_PER_PAGE = 20;
+const ITEMS_PER_PAGE = 50;
 
 export function OrdersTable({
   items,

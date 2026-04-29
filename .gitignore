@@ -9,8 +9,18 @@ lerna-debug.log*
 
 node_modules
 dist
+data/
 dist-ssr
 *.local
+.env
+.env.local
+.env*.local
+
+# Local Cursor files
+.cursor/
+
+# Local debug exports
+oblio_response.json
 
 # Editor directories and files
 .vscode/*

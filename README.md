@@ -1,73 +1,69 @@
-# Welcome to your Lovable project
+# Profit Pulse
 
-## Project info
+Dashboard de **profitabilitate** pentru magazinul online **Gorgeaux.ro** – calculează profitul pe lună pe baza facturilor Oblio, costurilor de producție din Google Sheets și cheltuielilor introduse manual.
 
-**URL**: https://lovable.dev/projects/f2002cc4-0efe-4c01-89ff-7489a9902556
+## Ce face aplicația
 
-## How can I edit this code?
+- **Facturi ONL** – sincronizare din Oblio API, vizualizare
+- **Costuri producție** – citire din Google Sheets (SKU → cost/unitate)
+- **Profitabilitate lunară** – Sept 2024 … Martie 2026
+  - Sumă facturată, cost producție, profit comenzi
+  - Cheltuieli (Emag, transport etc.) cu TVA
+  - Profit final, export PDF
+- **Profit final total** – agregare pe toate lunile
 
-There are several ways of editing your application.
+## Documentație completă
 
-**Use Lovable**
+Documentația este organizată în folderul [`docs/`](./docs/):
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/f2002cc4-0efe-4c01-89ff-7489a9902556) and start prompting.
+| Document | Conținut |
+|----------|----------|
+| [docs/README.md](./docs/README.md) | Index documentație |
+| [01-ARHITECTURA](./docs/01-ARHITECTURA.md) | Arhitectură, fluxuri, tehnologii |
+| [02-STRUCTURA-PROIECT](./docs/02-STRUCTURA-PROIECT.md) | Structura fișierelor, unde găsești fiecare lucru |
+| [03-API-BACKEND](./docs/03-API-BACKEND.md) | Endpoint-uri API |
+| [04-FRONTEND](./docs/04-FRONTEND.md) | Pagini, componente, routing |
+| [05-CONFIGURARE](./docs/05-CONFIGURARE.md) | Variabile mediu, Oblio, Google Sheets |
+| [06-DEPLOYMENT](./docs/06-DEPLOYMENT.md) | Deployment, inclusiv **Google Cloud** |
 
-Changes made via Lovable will be committed automatically to this repo.
+## Quick Start
 
-**Use your preferred IDE**
+```bash
+# 1. Clonează și instalează
+git clone <url-repo>
+cd profit-pulse
+npm install
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+# 2. Configurare
+cp .env.example .env
+# Completează .env cu OBLIO_EMAIL, OBLIO_SECRET, OBLIO_CIF,
+# GOOGLE_SHEETS_CLIENT_EMAIL, GOOGLE_SHEETS_PRIVATE_KEY, GOOGLE_SHEETS_SPREADSHEET_ID
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+# 3. Pornește
+npm run dev:fullstack
 ```
 
-**Edit a file directly in GitHub**
+- **Frontend**: http://localhost:8080  
+- **Backend API**: http://localhost:4000  
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Probleme frecvente
 
-**Use GitHub Codespaces**
+**Erori în consolă la `/api/...` (ECONNREFUSED, proxy error)**  
+Aplicația are nevoie de **ambele** procese: Vite (8080) și Express (4000). Dacă rulezi `dev:fullstack` de două ori sau rămâne un proces vechi, portul 4000 poate fi ocupat: backend-ul nu pornește, dar frontend-ul da, iar API-ul nu răspunde.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- Oprește toate terminalele unde rulează `npm run dev` / `dev:fullstack` (Ctrl+C).
+- Pornește din nou: `npm run dev:fullstack` — scriptul eliberează porturile **4000** și **8080** înainte de pornire.
+- Verifică manual: în browser deschide `http://localhost:4000/health` — ar trebui să vezi `{"status":"ok"}`.
 
-## What technologies are used for this project?
+**Lipsește `.env`**  
+Backend-ul necesită credențiale Oblio și Google Sheets pentru sincronizare și costuri. Copiază `.env.example` în `.env` și completează valorile.
 
-This project is built with:
+## Tehnologii
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- **Frontend**: React, Vite, TypeScript, shadcn/ui, Tailwind
+- **Backend**: Node.js, Express
+- **Externe**: Oblio API (facturi), Google Sheets API (costuri)
 
-## How can I deploy this project?
+## Deployment pe Google Cloud
 
-Simply open [Lovable](https://lovable.dev/projects/f2002cc4-0efe-4c01-89ff-7489a9902556) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Da, poți hosta aplicația pe **Google Cloud** pe un server propriu (Compute Engine) sau serverless (Cloud Run). Ghid detaliat: [docs/06-DEPLOYMENT.md](./docs/06-DEPLOYMENT.md).

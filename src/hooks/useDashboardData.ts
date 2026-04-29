@@ -34,7 +34,14 @@ export interface OrderItem {
     easysales_order_id: string;
     order_date: string;
     customer_name: string | null;
+    shipping_cost: number;
+    discount_amount: number;
   };
+}
+
+export interface OrderTotals {
+  totalShipping: number;
+  totalDiscounts: number;
 }
 
 export function useDashboardData() {
@@ -186,7 +193,7 @@ export function useDashboardData() {
       while (hasMore) {
         const { data, error } = await supabase
           .from("order_items")
-          .select("*, orders!inner(easysales_order_id, order_date, customer_name)")
+          .select("*, orders!inner(easysales_order_id, order_date, customer_name, shipping_cost, discount_amount)")
           .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
         if (error) throw error;
@@ -211,21 +218,57 @@ export function useDashboardData() {
     },
   });
 
+  // Query to get order totals (shipping and discounts) directly from orders table
+  const orderTotalsQuery = useQuery({
+    queryKey: ["order-totals"],
+    queryFn: async (): Promise<OrderTotals> => {
+      const PAGE_SIZE = 1000;
+      let allOrders: { shipping_cost: number; discount_amount: number }[] = [];
+      let page = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("orders")
+          .select("shipping_cost, discount_amount")
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allOrders = [...allOrders, ...data];
+          hasMore = data.length === PAGE_SIZE;
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const totalShipping = allOrders.reduce((sum, order) => sum + Number(order.shipping_cost), 0);
+      const totalDiscounts = allOrders.reduce((sum, order) => sum + Number(order.discount_amount), 0);
+
+      return { totalShipping, totalDiscounts };
+    },
+  });
+
   return {
     metrics: metricsQuery.data,
     chartData: chartDataQuery.data || [],
     topProducts: topProductsQuery.data || [],
     recentItems: recentItemsQuery.data || [],
+    orderTotals: orderTotalsQuery.data || { totalShipping: 0, totalDiscounts: 0 },
     isLoading:
       metricsQuery.isLoading ||
       chartDataQuery.isLoading ||
       topProductsQuery.isLoading ||
-      recentItemsQuery.isLoading,
+      recentItemsQuery.isLoading ||
+      orderTotalsQuery.isLoading,
     refetch: () => {
       metricsQuery.refetch();
       chartDataQuery.refetch();
       topProductsQuery.refetch();
       recentItemsQuery.refetch();
+      orderTotalsQuery.refetch();
     },
   };
 }
